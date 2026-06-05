@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Non-sandboxed: no com.apple.security.app-sandbox entitlement. -->
+    <!-- Hardened Runtime is enabled for notarization (M10). -->
+    <!-- Network client access needed to load remote images in documents. -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+</dict>
+</plist>

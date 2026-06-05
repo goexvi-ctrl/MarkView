@@ -1,0 +1,24 @@
+# Xcode user data
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Xcode build products
+DerivedData/
+build/
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# Swift Package Manager build cache (not the checkouts/resolved)
+.build/
+
+# Profiling
+*.profraw
+*.profdata
+
+# macOS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db

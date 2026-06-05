@@ -1,0 +1,644 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		5F00PKG2000000000000BBBB /* CmarkGFM in Frameworks */ = {isa = PBXBuildFile; productRef = 5F00PKG1000000000000BBBB /* CmarkGFM */; };
+		5F00PKG5000000000000BBBB /* BeautifulMermaid in Frameworks */ = {isa = PBXBuildFile; productRef = 5F00PKG4000000000000BBBB /* BeautifulMermaid */; };
+		5F002001000000000000BBBB /* MarkViewApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001001000000000000BBBB /* MarkViewApp.swift */; };
+		5F002002000000000000BBBB /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001002000000000000BBBB /* AppDelegate.swift */; };
+		5F002003000000000000BBBB /* Commands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001003000000000000BBBB /* Commands.swift */; };
+		5F002010000000000000BBBB /* DocumentWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001010000000000000BBBB /* DocumentWindowController.swift */; };
+		5F002011000000000000BBBB /* DocumentWindowRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001011000000000000BBBB /* DocumentWindowRegistry.swift */; };
+		5F002012000000000000BBBB /* MarkdownWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001012000000000000BBBB /* MarkdownWebView.swift */; };
+		5F002013000000000000BBBB /* WebViewCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001013000000000000BBBB /* WebViewCoordinator.swift */; };
+		5F002020000000000000BBBB /* MarkdownDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001020000000000000BBBB /* MarkdownDocument.swift */; };
+		5F002021000000000000BBBB /* DocumentKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001021000000000000BBBB /* DocumentKey.swift */; };
+		5F002022000000000000BBBB /* FileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001022000000000000BBBB /* FileWatcher.swift */; };
+		5F002023000000000000BBBB /* RecentDocumentsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001023000000000000BBBB /* RecentDocumentsStore.swift */; };
+		5F002030000000000000BBBB /* MarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001030000000000000BBBB /* MarkdownRenderer.swift */; };
+		5F002031000000000000BBBB /* HeadingSlugger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001031000000000000BBBB /* HeadingSlugger.swift */; };
+		5F002032000000000000BBBB /* HTMLTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001032000000000000BBBB /* HTMLTemplate.swift */; };
+		5F002033000000000000BBBB /* AssetSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001033000000000000BBBB /* AssetSchemeHandler.swift */; };
+		5F002034000000000000BBBB /* LinkClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001034000000000000BBBB /* LinkClassifier.swift */; };
+		5F002035000000000000BBBB /* HTMLSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001035000000000000BBBB /* HTMLSanitizer.swift */; };
+		5F002040000000000000BBBB /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001040000000000000BBBB /* SettingsStore.swift */; };
+		5F002041000000000000BBBB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001041000000000000BBBB /* SettingsView.swift */; };
+		5F002042000000000000BBBB /* FontPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001042000000000000BBBB /* FontPicker.swift */; };
+		5F002053000000000000BBBB /* WebAssets in Resources */ = {isa = PBXBuildFile; fileRef = 5F001053000000000000BBBB /* WebAssets */; };
+		5F002054000000000000BBBB /* MarkdownCheatSheet.md in Resources */ = {isa = PBXBuildFile; fileRef = 5F001054000000000000BBBB /* MarkdownCheatSheet.md */; };
+		5F003080000000000000BBBB /* RendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001080000000000000BBBB /* RendererTests.swift */; };
+		5F003081000000000000BBBB /* DocumentKeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001081000000000000BBBB /* DocumentKeyTests.swift */; };
+		5F003082000000000000BBBB /* LinkClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001082000000000000BBBB /* LinkClassifierTests.swift */; };
+		5F003083000000000000BBBB /* HeadingSluggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001083000000000000BBBB /* HeadingSluggerTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5F000051000000000000BBBB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5F00PROJ000000000000BBBB /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5F000001000000000000BBBB;
+			remoteInfo = MarkView;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		5F001001000000000000BBBB /* MarkViewApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkViewApp.swift; sourceTree = "<group>"; };
+		5F001002000000000000BBBB /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		5F001003000000000000BBBB /* Commands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Commands.swift; sourceTree = "<group>"; };
+		5F001010000000000000BBBB /* DocumentWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWindowController.swift; sourceTree = "<group>"; };
+		5F001011000000000000BBBB /* DocumentWindowRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWindowRegistry.swift; sourceTree = "<group>"; };
+		5F001012000000000000BBBB /* MarkdownWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownWebView.swift; sourceTree = "<group>"; };
+		5F001013000000000000BBBB /* WebViewCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewCoordinator.swift; sourceTree = "<group>"; };
+		5F001020000000000000BBBB /* MarkdownDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownDocument.swift; sourceTree = "<group>"; };
+		5F001021000000000000BBBB /* DocumentKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentKey.swift; sourceTree = "<group>"; };
+		5F001022000000000000BBBB /* FileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcher.swift; sourceTree = "<group>"; };
+		5F001023000000000000BBBB /* RecentDocumentsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentDocumentsStore.swift; sourceTree = "<group>"; };
+		5F001030000000000000BBBB /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
+		5F001031000000000000BBBB /* HeadingSlugger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeadingSlugger.swift; sourceTree = "<group>"; };
+		5F001032000000000000BBBB /* HTMLTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLTemplate.swift; sourceTree = "<group>"; };
+		5F001033000000000000BBBB /* AssetSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetSchemeHandler.swift; sourceTree = "<group>"; };
+		5F001034000000000000BBBB /* LinkClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkClassifier.swift; sourceTree = "<group>"; };
+		5F001035000000000000BBBB /* HTMLSanitizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLSanitizer.swift; sourceTree = "<group>"; };
+		5F001040000000000000BBBB /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
+		5F001041000000000000BBBB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		5F001042000000000000BBBB /* FontPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontPicker.swift; sourceTree = "<group>"; };
+		5F001053000000000000BBBB /* WebAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = WebAssets; sourceTree = "<group>"; };
+		5F001054000000000000BBBB /* MarkdownCheatSheet.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MarkdownCheatSheet.md; sourceTree = "<group>"; };
+		5F001060000000000000BBBB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		5F001061000000000000BBBB /* MarkView.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MarkView.entitlements; sourceTree = "<group>"; };
+		5F001070000000000000BBBB /* MarkView.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MarkView.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5F001071000000000000BBBB /* MarkViewTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MarkViewTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5F001080000000000000BBBB /* RendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RendererTests.swift; sourceTree = "<group>"; };
+		5F001081000000000000BBBB /* DocumentKeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentKeyTests.swift; sourceTree = "<group>"; };
+		5F001082000000000000BBBB /* LinkClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkClassifierTests.swift; sourceTree = "<group>"; };
+		5F001083000000000000BBBB /* HeadingSluggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeadingSluggerTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		5F000015000000000000BBBB /* Stamp BuildDate */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp BuildDate";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Write the build timestamp into the built Info.plist.\nBUILD_DATE=$(date '+%Y-%m-%d %H:%M')\n/usr/libexec/PlistBuddy -c \"Delete :BuildDate\" \"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\" 2>/dev/null || true\n/usr/libexec/PlistBuddy -c \"Add :BuildDate string ${BUILD_DATE}\" \"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5F000012000000000000BBBB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5F00PKG2000000000000BBBB /* CmarkGFM in Frameworks */,
+				5F00PKG5000000000000BBBB /* BeautifulMermaid in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F000014000000000000BBBB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		5F00GRP1000000000000BBBB /* MarkView */ = {
+			isa = PBXGroup;
+			children = (
+				5F00GRP2000000000000BBBB /* Sources */,
+				5F00GRP8000000000000BBBB /* Resources */,
+				5F00GRPA000000000000BBBB /* Tests */,
+				5F001060000000000000BBBB /* Info.plist */,
+				5F001061000000000000BBBB /* MarkView.entitlements */,
+				5F00GRP0000000000000BBBB /* Products */,
+			);
+			name = MarkView;
+			sourceTree = "<group>";
+		};
+		5F00GRP0000000000000BBBB /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5F001070000000000000BBBB /* MarkView.app */,
+				5F001071000000000000BBBB /* MarkViewTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		5F00GRP2000000000000BBBB /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				5F00GRP3000000000000BBBB /* App */,
+				5F00GRP4000000000000BBBB /* Windows */,
+				5F00GRP5000000000000BBBB /* Model */,
+				5F00GRP6000000000000BBBB /* Render */,
+				5F00GRP7000000000000BBBB /* Settings */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		5F00GRP3000000000000BBBB /* App */ = {
+			isa = PBXGroup;
+			children = (
+				5F001001000000000000BBBB /* MarkViewApp.swift */,
+				5F001002000000000000BBBB /* AppDelegate.swift */,
+				5F001003000000000000BBBB /* Commands.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		5F00GRP4000000000000BBBB /* Windows */ = {
+			isa = PBXGroup;
+			children = (
+				5F001010000000000000BBBB /* DocumentWindowController.swift */,
+				5F001011000000000000BBBB /* DocumentWindowRegistry.swift */,
+				5F001012000000000000BBBB /* MarkdownWebView.swift */,
+				5F001013000000000000BBBB /* WebViewCoordinator.swift */,
+			);
+			path = Windows;
+			sourceTree = "<group>";
+		};
+		5F00GRP5000000000000BBBB /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				5F001020000000000000BBBB /* MarkdownDocument.swift */,
+				5F001021000000000000BBBB /* DocumentKey.swift */,
+				5F001022000000000000BBBB /* FileWatcher.swift */,
+				5F001023000000000000BBBB /* RecentDocumentsStore.swift */,
+			);
+			path = Model;
+			sourceTree = "<group>";
+		};
+		5F00GRP6000000000000BBBB /* Render */ = {
+			isa = PBXGroup;
+			children = (
+				5F001030000000000000BBBB /* MarkdownRenderer.swift */,
+				5F001031000000000000BBBB /* HeadingSlugger.swift */,
+				5F001032000000000000BBBB /* HTMLTemplate.swift */,
+				5F001033000000000000BBBB /* AssetSchemeHandler.swift */,
+				5F001034000000000000BBBB /* LinkClassifier.swift */,
+				5F001035000000000000BBBB /* HTMLSanitizer.swift */,
+			);
+			path = Render;
+			sourceTree = "<group>";
+		};
+		5F00GRP7000000000000BBBB /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				5F001040000000000000BBBB /* SettingsStore.swift */,
+				5F001041000000000000BBBB /* SettingsView.swift */,
+				5F001042000000000000BBBB /* FontPicker.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		5F00GRP8000000000000BBBB /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				5F001053000000000000BBBB /* WebAssets */,
+				5F001054000000000000BBBB /* MarkdownCheatSheet.md */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		5F00GRPA000000000000BBBB /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				5F001080000000000000BBBB /* RendererTests.swift */,
+				5F001081000000000000BBBB /* DocumentKeyTests.swift */,
+				5F001082000000000000BBBB /* LinkClassifierTests.swift */,
+				5F001083000000000000BBBB /* HeadingSluggerTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5F000001000000000000BBBB /* MarkView */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5F000021000000000000BBBB /* Build configuration list for PBXNativeTarget "MarkView" */;
+			buildPhases = (
+				5F000010000000000000BBBB /* Sources */,
+				5F000012000000000000BBBB /* Frameworks */,
+				5F000011000000000000BBBB /* Resources */,
+				5F000015000000000000BBBB /* Stamp BuildDate */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MarkView;
+			packageProductDependencies = (
+				5F00PKG1000000000000BBBB /* CmarkGFM */,
+				5F00PKG4000000000000BBBB /* BeautifulMermaid */,
+			);
+			productName = MarkView;
+			productReference = 5F001070000000000000BBBB /* MarkView.app */;
+			productType = "com.apple.product-type.application";
+		};
+		5F000002000000000000BBBB /* MarkViewTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5F000022000000000000BBBB /* Build configuration list for PBXNativeTarget "MarkViewTests" */;
+			buildPhases = (
+				5F000013000000000000BBBB /* Sources */,
+				5F000014000000000000BBBB /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5F000050000000000000BBBB /* PBXTargetDependency */,
+			);
+			name = MarkViewTests;
+			productName = MarkViewTests;
+			productReference = 5F001071000000000000BBBB /* MarkViewTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5F00PROJ000000000000BBBB /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1700;
+				LastUpgradeCheck = 1700;
+				TargetAttributes = {
+					5F000001000000000000BBBB = {
+						CreatedOnToolsVersion = 17.0;
+					};
+					5F000002000000000000BBBB = {
+						CreatedOnToolsVersion = 17.0;
+						TestTargetID = 5F000001000000000000BBBB;
+					};
+				};
+			};
+			buildConfigurationList = 5F000020000000000000BBBB /* Build configuration list for PBXProject "MarkView" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 5F00GRP1000000000000BBBB;
+			productRefGroup = 5F00GRP0000000000000BBBB /* Products */;
+			packageReferences = (
+				5F00PKG0000000000000BBBB /* XCLocalSwiftPackageReference "Vendor/CmarkGFM" */,
+				5F00PKG3000000000000BBBB /* XCRemoteSwiftPackageReference "beautiful-mermaid-swift" */,
+			);
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5F000001000000000000BBBB /* MarkView */,
+				5F000002000000000000BBBB /* MarkViewTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5F000011000000000000BBBB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5F002053000000000000BBBB /* WebAssets in Resources */,
+				5F002054000000000000BBBB /* MarkdownCheatSheet.md in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5F000010000000000000BBBB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5F002001000000000000BBBB /* MarkViewApp.swift in Sources */,
+				5F002002000000000000BBBB /* AppDelegate.swift in Sources */,
+				5F002003000000000000BBBB /* Commands.swift in Sources */,
+				5F002010000000000000BBBB /* DocumentWindowController.swift in Sources */,
+				5F002011000000000000BBBB /* DocumentWindowRegistry.swift in Sources */,
+				5F002012000000000000BBBB /* MarkdownWebView.swift in Sources */,
+				5F002013000000000000BBBB /* WebViewCoordinator.swift in Sources */,
+				5F002020000000000000BBBB /* MarkdownDocument.swift in Sources */,
+				5F002021000000000000BBBB /* DocumentKey.swift in Sources */,
+				5F002022000000000000BBBB /* FileWatcher.swift in Sources */,
+				5F002023000000000000BBBB /* RecentDocumentsStore.swift in Sources */,
+				5F002030000000000000BBBB /* MarkdownRenderer.swift in Sources */,
+				5F002031000000000000BBBB /* HeadingSlugger.swift in Sources */,
+				5F002032000000000000BBBB /* HTMLTemplate.swift in Sources */,
+				5F002033000000000000BBBB /* AssetSchemeHandler.swift in Sources */,
+				5F002034000000000000BBBB /* LinkClassifier.swift in Sources */,
+				5F002035000000000000BBBB /* HTMLSanitizer.swift in Sources */,
+				5F002040000000000000BBBB /* SettingsStore.swift in Sources */,
+				5F002041000000000000BBBB /* SettingsView.swift in Sources */,
+				5F002042000000000000BBBB /* FontPicker.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F000013000000000000BBBB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5F003080000000000000BBBB /* RendererTests.swift in Sources */,
+				5F003081000000000000BBBB /* DocumentKeyTests.swift in Sources */,
+				5F003082000000000000BBBB /* LinkClassifierTests.swift in Sources */,
+				5F003083000000000000BBBB /* HeadingSluggerTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5F000050000000000000BBBB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5F000001000000000000BBBB /* MarkView */;
+			targetProxy = 5F000051000000000000BBBB /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		5F000030000000000000BBBB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_CYCLE = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		5F000031000000000000BBBB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_CYCLE = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		5F000032000000000000BBBB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MarkView.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.markview.MarkView";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		5F000033000000000000BBBB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MarkView.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.markview.MarkView";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		5F000034000000000000BBBB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.markview.MarkViewTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MarkView.app/Contents/MacOS/MarkView";
+			};
+			name = Debug;
+		};
+		5F000035000000000000BBBB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.markview.MarkViewTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MarkView.app/Contents/MacOS/MarkView";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		5F000020000000000000BBBB /* Build configuration list for PBXProject "MarkView" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5F000030000000000000BBBB /* Debug */,
+				5F000031000000000000BBBB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5F000021000000000000BBBB /* Build configuration list for PBXNativeTarget "MarkView" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5F000032000000000000BBBB /* Debug */,
+				5F000033000000000000BBBB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5F000022000000000000BBBB /* Build configuration list for PBXNativeTarget "MarkViewTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5F000034000000000000BBBB /* Debug */,
+				5F000035000000000000BBBB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		5F00PKG0000000000000BBBB /* XCLocalSwiftPackageReference "Vendor/CmarkGFM" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Vendor/CmarkGFM;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5F00PKG3000000000000BBBB /* XCRemoteSwiftPackageReference "beautiful-mermaid-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/lukilabs/beautiful-mermaid-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5F00PKG1000000000000BBBB /* CmarkGFM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5F00PKG0000000000000BBBB /* XCLocalSwiftPackageReference "Vendor/CmarkGFM" */;
+			productName = CmarkGFM;
+		};
+		5F00PKG4000000000000BBBB /* BeautifulMermaid */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5F00PKG3000000000000BBBB /* XCRemoteSwiftPackageReference "beautiful-mermaid-swift" */;
+			productName = BeautifulMermaid;
+		};
+/* End XCSwiftPackageProductDependency section */
+
+	};
+	rootObject = 5F00PROJ000000000000BBBB /* Project object */;
+}
