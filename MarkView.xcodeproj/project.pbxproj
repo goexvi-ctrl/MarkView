@@ -32,6 +32,7 @@
 		5F002042000000000000BBBB /* FontPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001042000000000000BBBB /* FontPicker.swift */; };
 		5F002053000000000000BBBB /* WebAssets in Resources */ = {isa = PBXBuildFile; fileRef = 5F001053000000000000BBBB /* WebAssets */; };
 		5F002054000000000000BBBB /* MarkdownCheatSheet.md in Resources */ = {isa = PBXBuildFile; fileRef = 5F001054000000000000BBBB /* MarkdownCheatSheet.md */; };
+		5F002055000000000000BBBB /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 5F001055000000000000BBBB /* AppIcon.icns */; };
 		5F003080000000000000BBBB /* RendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001080000000000000BBBB /* RendererTests.swift */; };
 		5F003085000000000000BBBB /* GoldenRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001085000000000000BBBB /* GoldenRendererTests.swift */; };
 		5F003081000000000000BBBB /* DocumentKeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001081000000000000BBBB /* DocumentKeyTests.swift */; };
@@ -73,6 +74,7 @@
 		5F001042000000000000BBBB /* FontPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontPicker.swift; sourceTree = "<group>"; };
 		5F001053000000000000BBBB /* WebAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = WebAssets; sourceTree = "<group>"; };
 		5F001054000000000000BBBB /* MarkdownCheatSheet.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MarkdownCheatSheet.md; sourceTree = "<group>"; };
+		5F001055000000000000BBBB /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		5F001060000000000000BBBB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		5F001061000000000000BBBB /* MarkView.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MarkView.entitlements; sourceTree = "<group>"; };
 		5F001070000000000000BBBB /* MarkView.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MarkView.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -221,6 +223,7 @@
 			children = (
 				5F001053000000000000BBBB /* WebAssets */,
 				5F001054000000000000BBBB /* MarkdownCheatSheet.md */,
+				5F001055000000000000BBBB /* AppIcon.icns */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -328,6 +331,7 @@
 			files = (
 				5F002053000000000000BBBB /* WebAssets in Resources */,
 				5F002054000000000000BBBB /* MarkdownCheatSheet.md in Resources */,
+				5F002055000000000000BBBB /* AppIcon.icns in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -510,6 +514,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
+				ICON_FILE = Resources/AppIcon.icns;
 				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -534,6 +539,7 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
+				ICON_FILE = Resources/AppIcon.icns;
 				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
