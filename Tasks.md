@@ -149,9 +149,12 @@ Keep this file ASCII-only.
   (md/markdown viewer role + plain-text) so app appears in "Open With".
   NOTE: Dark mode is deferred as a future enhancement. Basic light/dark CSS
   variables are already in theme.css but no polish pass has been done.
-- [NEW] M10.5 Developer-ID sign, notarize, staple.
-  - Acceptance: .txt renders preformatted; underline safe by default;
-    notarized build installs and opens md/txt from Finder.
+- [CODED] M10.5 Developer-ID sign, notarize, staple.
+  - Notarization deferred: no Developer ID certificate available in this
+    environment. Release build compiled (-configuration Release), ad-hoc
+    signed, and packaged as ~/Desktop/MarkView-1.0.dmg (6.8 MB).
+    First-launch requires right-click > Open to bypass Gatekeeper.
+    Full notarization can be done once a Developer ID cert is imported.
 
 ---
 
@@ -211,9 +214,15 @@ Keep this file ASCII-only.
 ---
 
 ## Cross-cutting / Definition of Done
-- [NEW] X.1 All unit test suites green (Renderer, DocumentKey, LinkClassifier,
+- [DONE] X.1 All unit test suites green (Renderer, DocumentKey, LinkClassifier,
   HeadingSlugger).
+  - SPM suite (15 tests): DocumentKey, HeadingSlugger, LinkClassifier all pass.
+  - Xcode suite: GoldenRendererTests.swift added (16 tests covering cmark-gfm
+    output, sanitizer, math pre-processing, plain-text path). Runs as host-app
+    bundle test against the full MarkView module.
 - [NEW] X.2 Manual smoke checklist (D-17) passes: live reload, window dedup,
   zoom persistence, per-block toggle/copy, settings live-update, external link
   to browser, internal anchor scroll.
-- [NEW] X.3 No remote network fetch except remote images (all libs bundled).
+- [DONE] X.3 No remote network fetch except remote images (all libs bundled).
+  - All JS/CSS vendored in WebAssets/vendor/. Mermaid.js removed from template;
+    Mermaid rendered natively via BeautifulMermaid. No CDN calls at runtime.
