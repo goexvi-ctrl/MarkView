@@ -23,7 +23,8 @@ let package = Package(
         .testTarget(
             name: "MarkViewTests",
             dependencies: ["MarkViewCore"],
-            path: "Tests"
+            path: "Tests",
+            exclude: ["GoldenRendererTests.swift"]  // requires Xcode test bundle (CmarkGFM + app host)
         ),
     ]
 )

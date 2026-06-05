@@ -115,12 +115,6 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
     // MARK: - Helpers
 
     private func showTransientBanner(_ message: String, in window: NSWindow?) {
-        // TODO M10: non-modal overlay banner
-        guard let window else { return }
-        let alert = NSAlert()
-        alert.messageText = "Navigation"
-        alert.informativeText = message
-        alert.alertStyle = .informational
-        alert.beginSheetModal(for: window, completionHandler: nil)
+        viewController?.showBanner(message, style: .warning, autoDismiss: true)
     }
 }

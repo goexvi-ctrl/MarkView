@@ -1,5 +1,6 @@
 import AppKit
 import WebKit
+import Combine
 
 // NSViewController that owns the WKWebView for a single document window.
 @MainActor
@@ -14,6 +15,7 @@ final class MarkdownWebViewController: NSViewController {
     private(set) var nonce: String = UUID().uuidString.replacingOccurrences(of: "-", with: "")
     // Cache for live-reload scroll restore (written by bridge, read by DWC)
     var lastScrollY: Double = 0
+    private var appearanceCancellable: AnyCancellable?
 
     init(document: MarkdownDocument, zoomFactor: Double) {
         self.document = document
@@ -36,6 +38,17 @@ final class MarkdownWebViewController: NSViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         loadDocument()
+        observeAppearance()
+    }
+
+    private func observeAppearance() {
+        appearanceCancellable = NSApp.publisher(for: \.effectiveAppearance)
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] appearance in
+                let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                self?.setAppearance(isDark)
+            }
     }
 
 
@@ -57,18 +70,65 @@ final class MarkdownWebViewController: NSViewController {
 
     // MARK: - Loading
 
+    // Large-file threshold: render off the main thread above this character count.
+    private static let asyncRenderThreshold = 100_000
+
     func loadDocument() {
-        nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-        let html = buildHTML()
-        webView.loadHTMLString(html, baseURL: document.fileURL)
+        dismissBanner()
+        renderAndLoad(restoreScrollY: nil)
     }
 
     func reload(document: MarkdownDocument, restoreScrollY: Double) {
         self.document = document
-        nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-        coordinator.pendingScrollRestore = restoreScrollY
-        let html = buildHTML()
-        webView.loadHTMLString(html, baseURL: document.fileURL)
+        dismissBanner()
+        renderAndLoad(restoreScrollY: restoreScrollY)
+    }
+
+    // Render HTML (potentially off-thread for large files), then load into webView.
+    private func renderAndLoad(restoreScrollY: Double?) {
+        let doc      = document
+        let zoom     = currentZoom
+        let settings = SettingsStore.shared
+        let newNonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        nonce = newNonce
+
+        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+
+        if doc.text.count > Self.asyncRenderThreshold {
+            // Off-main render: only the cmark-gfm/mermaid work is heavy.
+            // HTMLTemplate.build (settings access) runs back on main actor.
+            Task.detached(priority: .userInitiated) {
+                let body = MarkdownRenderer.render(document: doc, isDark: isDark)
+                await MainActor.run { [weak self] in
+                    guard let self, self.nonce == newNonce else { return }
+                    let html = HTMLTemplate.build(
+                        body: body, settings: settings,
+                        zoomFactor: zoom, nonce: newNonce
+                    )
+                    if let y = restoreScrollY { self.coordinator.pendingScrollRestore = y }
+                    self.webView.loadHTMLString(html, baseURL: doc.fileURL)
+                    self.showEncodingBannerIfNeeded(for: doc)
+                }
+            }
+        } else {
+            let body = MarkdownRenderer.render(document: doc, isDark: isDark)
+            let html = HTMLTemplate.build(
+                body: body, settings: settings,
+                zoomFactor: zoom, nonce: newNonce
+            )
+            if let y = restoreScrollY { coordinator.pendingScrollRestore = y }
+            webView.loadHTMLString(html, baseURL: doc.fileURL)
+            showEncodingBannerIfNeeded(for: doc)
+        }
+    }
+
+    private func showEncodingBannerIfNeeded(for doc: MarkdownDocument) {
+        if doc.usedLossyEncoding {
+            showBanner(
+                "\(doc.displayTitle) contains invalid UTF-8 and was decoded with a lossy fallback.",
+                style: .warning, autoDismiss: true
+            )
+        }
     }
 
     private func buildHTML() -> String {

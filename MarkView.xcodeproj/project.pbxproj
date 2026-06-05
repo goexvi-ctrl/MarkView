@@ -13,6 +13,7 @@
 		5F002002000000000000BBBB /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001002000000000000BBBB /* AppDelegate.swift */; };
 		5F002003000000000000BBBB /* Commands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001003000000000000BBBB /* Commands.swift */; };
 		5F002010000000000000BBBB /* DocumentWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001010000000000000BBBB /* DocumentWindowController.swift */; };
+		5F002016000000000000BBBB /* InfoBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001016000000000000BBBB /* InfoBanner.swift */; };
 		5F002011000000000000BBBB /* DocumentWindowRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001011000000000000BBBB /* DocumentWindowRegistry.swift */; };
 		5F002012000000000000BBBB /* MarkdownWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001012000000000000BBBB /* MarkdownWebView.swift */; };
 		5F002013000000000000BBBB /* WebViewCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001013000000000000BBBB /* WebViewCoordinator.swift */; };
@@ -32,6 +33,7 @@
 		5F002053000000000000BBBB /* WebAssets in Resources */ = {isa = PBXBuildFile; fileRef = 5F001053000000000000BBBB /* WebAssets */; };
 		5F002054000000000000BBBB /* MarkdownCheatSheet.md in Resources */ = {isa = PBXBuildFile; fileRef = 5F001054000000000000BBBB /* MarkdownCheatSheet.md */; };
 		5F003080000000000000BBBB /* RendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001080000000000000BBBB /* RendererTests.swift */; };
+		5F003085000000000000BBBB /* GoldenRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001085000000000000BBBB /* GoldenRendererTests.swift */; };
 		5F003081000000000000BBBB /* DocumentKeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001081000000000000BBBB /* DocumentKeyTests.swift */; };
 		5F003082000000000000BBBB /* LinkClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001082000000000000BBBB /* LinkClassifierTests.swift */; };
 		5F003083000000000000BBBB /* HeadingSluggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001083000000000000BBBB /* HeadingSluggerTests.swift */; };
@@ -52,6 +54,7 @@
 		5F001002000000000000BBBB /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		5F001003000000000000BBBB /* Commands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Commands.swift; sourceTree = "<group>"; };
 		5F001010000000000000BBBB /* DocumentWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWindowController.swift; sourceTree = "<group>"; };
+		5F001016000000000000BBBB /* InfoBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoBanner.swift; sourceTree = "<group>"; };
 		5F001011000000000000BBBB /* DocumentWindowRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWindowRegistry.swift; sourceTree = "<group>"; };
 		5F001012000000000000BBBB /* MarkdownWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownWebView.swift; sourceTree = "<group>"; };
 		5F001013000000000000BBBB /* WebViewCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewCoordinator.swift; sourceTree = "<group>"; };
@@ -75,6 +78,7 @@
 		5F001070000000000000BBBB /* MarkView.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MarkView.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5F001071000000000000BBBB /* MarkViewTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MarkViewTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5F001080000000000000BBBB /* RendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RendererTests.swift; sourceTree = "<group>"; };
+		5F001085000000000000BBBB /* GoldenRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoldenRendererTests.swift; sourceTree = "<group>"; };
 		5F001081000000000000BBBB /* DocumentKeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentKeyTests.swift; sourceTree = "<group>"; };
 		5F001082000000000000BBBB /* LinkClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkClassifierTests.swift; sourceTree = "<group>"; };
 		5F001083000000000000BBBB /* HeadingSluggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeadingSluggerTests.swift; sourceTree = "<group>"; };
@@ -170,6 +174,7 @@
 			isa = PBXGroup;
 			children = (
 				5F001010000000000000BBBB /* DocumentWindowController.swift */,
+				5F001016000000000000BBBB /* InfoBanner.swift */,
 				5F001011000000000000BBBB /* DocumentWindowRegistry.swift */,
 				5F001012000000000000BBBB /* MarkdownWebView.swift */,
 				5F001013000000000000BBBB /* WebViewCoordinator.swift */,
@@ -224,6 +229,7 @@
 			isa = PBXGroup;
 			children = (
 				5F001080000000000000BBBB /* RendererTests.swift */,
+				5F001085000000000000BBBB /* GoldenRendererTests.swift */,
 				5F001081000000000000BBBB /* DocumentKeyTests.swift */,
 				5F001082000000000000BBBB /* LinkClassifierTests.swift */,
 				5F001083000000000000BBBB /* HeadingSluggerTests.swift */,
@@ -336,6 +342,7 @@
 				5F002002000000000000BBBB /* AppDelegate.swift in Sources */,
 				5F002003000000000000BBBB /* Commands.swift in Sources */,
 				5F002010000000000000BBBB /* DocumentWindowController.swift in Sources */,
+				5F002016000000000000BBBB /* InfoBanner.swift in Sources */,
 				5F002011000000000000BBBB /* DocumentWindowRegistry.swift in Sources */,
 				5F002012000000000000BBBB /* MarkdownWebView.swift in Sources */,
 				5F002013000000000000BBBB /* WebViewCoordinator.swift in Sources */,
@@ -360,6 +367,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5F003080000000000000BBBB /* RendererTests.swift in Sources */,
+				5F003085000000000000BBBB /* GoldenRendererTests.swift in Sources */,
 				5F003081000000000000BBBB /* DocumentKeyTests.swift in Sources */,
 				5F003082000000000000BBBB /* LinkClassifierTests.swift in Sources */,
 				5F003083000000000000BBBB /* HeadingSluggerTests.swift in Sources */,

@@ -41,20 +41,20 @@ Keep this file ASCII-only.
   into `template.html`.
 - [DONE] M2.4 `theme.css`: GitHub-like light + dark; full inline style map from
   D-9.1 (em/strong/both, del strikethrough, ins/u underline, code).
-- [CODED] M2.5 Golden renderer tests (D-17): GFM tables, task lists, nested
+- [DONE] M2.5 Golden renderer tests (D-17): GFM tables, task lists, nested
   lists, code fences, footnotes; include real Claude- and GitHub-authored docs.
   - Acceptance: rendering a sample doc matches expected HTML fragments; all
     inline styles render correctly.
 
 ## M3 - WebView Asset Loading (D-6)
 
-- [CODED] M3.1 `AssetSchemeHandler` (`asset://`) serving files from bundled
+- [DONE] M3.1 `AssetSchemeHandler` (`asset://`) serving files from bundled
   `Resources/WebAssets`; reject path traversal.
-- [CODED] M3.2 Enable `allowFileAccessFromFileURLs` /
+- [DONE] M3.2 Enable `allowFileAccessFromFileURLs` /
   `allowUniversalAccessFromFileURLs` on the WKWebView config.
-- [CODED] M3.3 Load generated HTML via `loadHTMLString(_, baseURL:
+- [DONE] M3.3 Load generated HTML via `loadHTMLString(_, baseURL:
   documentDirectoryURL)` so relative images and links resolve.
-- [CODED] M3.4 Verify local relative images, bundled libs, and remote (https)
+- [DONE] M3.4 Verify local relative images, bundled libs, and remote (https)
   images all load.
   - Acceptance: a doc with `![](images/x.png)`, an https image, and bundled JS
     all display.
@@ -95,7 +95,7 @@ Keep this file ASCII-only.
 - [DONE] M6.2 Atomic-save handling: on rename/delete, watch parent dir and
   re-arm the file watch when the path reappears.
 - [DONE] M6.3 Debounce (~150 ms) and coalesce burst writes.
-- [CODED] M6.4 On change: capture scrollY via bridge, re-render, reload, then
+- [DONE] M6.4 On change: capture scrollY via bridge, re-render, reload, then
   `restoreScroll(y)` on domReady. Deleted-file grace period + banner.
   - Acceptance: editing/saving the file (incl. atomic save) refreshes the view
     within ~150 ms with scroll position preserved.
@@ -108,7 +108,7 @@ Keep this file ASCII-only.
   flash.
 - [DONE] M7.3 Scroll mode (overflow-x auto, native horizontal scroll) and
   shrink mode (font-size scaling to fit, floor ~7px then fall back to scroll).
-- [CODED] M7.4 Per-block mode map keyed by index+text-hash, re-applied after
+- [DONE] M7.4 Per-block mode map keyed by index+text-hash, re-applied after
   reload; default mode from Settings; `ResizeObserver` recomputes shrink blocks
   on resize.
   - Acceptance: a too-wide code block can copy, toggle scroll<->shrink per
@@ -130,8 +130,8 @@ Keep this file ASCII-only.
 - [DONE] M9.1 `SettingsStore` (ObservableObject over UserDefaults), published.
 - [DONE] M9.2 `SettingsView` SwiftUI Settings scene (Cmd-,): body font, code
   font, default size, default code mode, theme, "Allow unsafe HTML".
-- [CODED] M9.3 Live propagation to all open windows via `applySettings`.
-- [NEW] M9.4 Live preview pane rendering a sample document.
+- [DONE] M9.3 Live propagation to all open windows via `applySettings`.
+- [DONE] M9.4 Live preview pane rendering a sample document.
   - Acceptance: changing any setting updates all open windows immediately.
 
 ## M10 - Plain Text + Security + Polish (D-5.7, D-11, D-15, D-21)
@@ -142,10 +142,10 @@ Keep this file ASCII-only.
 - [DONE] M10.2 GitHub-style allowlist sanitizer (keep ins/u/kbd/sub/sup/del...,
   strip script/iframe/on*=/javascript:); "Allow unsafe HTML" opt-in bypass.
   Verify `<ins>`/`<u>` underline works with the toggle OFF.
-- [CODED] M10.3 Edge cases (D-15): large files off-main-thread + loading state;
+- [DONE] M10.3 Edge cases (D-15): large files off-main-thread + loading state;
   invalid UTF-8 lossy decode + banner; appearance change re-theme; file
   replaced/permissions lost banner; anchor-not-found toast.
-- [CODED] M10.4 Error banners; `Info.plist` document type UTIs
+- [DONE] M10.4 Error banners; `Info.plist` document type UTIs
   (md/markdown viewer role + plain-text) so app appears in "Open With".
   NOTE: Dark mode is deferred as a future enhancement. Basic light/dark CSS
   variables are already in theme.css but no polish pass has been done.

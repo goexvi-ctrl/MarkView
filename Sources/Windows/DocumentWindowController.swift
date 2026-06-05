@@ -112,13 +112,25 @@ final class DocumentWindowController: NSWindowController {
 
     private func handleFileChange() {
         guard let webVC = webViewController else { return }
+
+        // File gone? Show a persistent banner and keep the last rendered content.
+        guard FileManager.default.fileExists(atPath: markdownDocument.fileURL.path) else {
+            webVC.showBanner("File removed: \(markdownDocument.displayTitle)",
+                             style: .warning, autoDismiss: false)
+            return
+        }
+        // File returned after being gone — dismiss any stale banner.
+        webVC.dismissBanner()
+
         webVC.captureScrollPosition { [weak self, weak webVC] (scrollY: Double) in
             guard let self, let webVC else { return }
             do {
                 try self.markdownDocument.reload()
                 webVC.reload(document: self.markdownDocument, restoreScrollY: scrollY)
             } catch {
-                // File gone or unreadable; preserve last content; banner in M10
+                webVC.showBanner(
+                    "Could not read \(self.markdownDocument.displayTitle): \(error.localizedDescription)",
+                    style: .error, autoDismiss: false)
             }
         }
     }
