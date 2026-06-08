@@ -42,6 +42,9 @@ final class DocumentWindowController: NSWindowController {
     /// so that repeated presses of the titlebar ⓘ reuse it instead of spawning multiples.
     private var currentInfoPanel: NSPanel?
 
+    /// The revision selector pop-up button in the title bar (for direct jump to any commit).
+    private var revisionPopUpButton: NSPopUpButton?
+
     init(document: MarkdownDocument) {
         self.markdownDocument = document
         let window = NSWindow(
@@ -138,6 +141,9 @@ final class DocumentWindowController: NSWindowController {
 
         // Add a small "i" info button in the title bar (leading side) for commit/live info.
         setupTitlebarInfoButton()
+
+        // Revision selector button (pop-up menu) in title bar for direct access to any commit.
+        setupTitlebarRevisionSelector()
     }
 
     private func setupTitlebarInfoButton() {
@@ -172,10 +178,8 @@ final class DocumentWindowController: NSWindowController {
     required init?(coder: NSCoder) { fatalError() }
 
     deinit {
-        // Ensure any orphaned info popup is closed when this controller is released.
-        // deinit runs in a non-isolated context even for @MainActor classes, so
-        // we must explicitly assume main-actor isolation (safe for UI controllers
-        // that are always deallocated on the main thread).
+        // deinit is nonisolated even for @MainActor classes. We use assumeIsolated
+        // because deallocation of NSWindowController always happens on the main thread.
         MainActor.assumeIsolated {
             dismissInfoPanel()
         }
@@ -287,6 +291,8 @@ final class DocumentWindowController: NSWindowController {
         webVC.showBanner(msg, style: .info, autoDismiss: false, action: ("Return to current", { [weak self] in
             self?.handleReturnToCurrent()
         }))
+
+        self.updateRevisionPopUpSelection()
     }
 
     func exitHistoricalView() {
@@ -302,6 +308,8 @@ final class DocumentWindowController: NSWindowController {
         window?.title = markdownDocument.displayTitle
 
         webViewController?.exitHistoricalView()
+
+        self.updateRevisionPopUpSelection()
 
         // Note: webVC.exitHistoricalView() already does a loadDocument() for the live text
         // (with hasInitialContentLoaded forced false so it does a full loadHTMLString).
@@ -363,6 +371,8 @@ final class DocumentWindowController: NSWindowController {
                               let idx = list.firstIndex(where: { $0.sha == currentOverride.sha }) {
                         self.currentHistoryIndex = idx
                     }
+
+                    self.updateRevisionPopUpButton()
                 }
             } catch {
                 // Non-fatal for stepping; the user can still use explicit version pickers later.
@@ -397,6 +407,7 @@ final class DocumentWindowController: NSWindowController {
         if historyVersions.isEmpty {
             do {
                 historyVersions = try await gitClient.history(for: markdownDocument.fileURL, limit: 100)
+                updateRevisionPopUpButton()
             } catch {
                 webViewController?.showBanner(
                     "Could not load history for stepping: \(error.localizedDescription)",
@@ -613,6 +624,115 @@ final class DocumentWindowController: NSWindowController {
 
         // Normal in-place historical view inside what was originally a live window.
         exitHistoricalView()
+    }
+
+    // MARK: - Direct revision selection (titlebar pop-up menu)
+
+    private func setupTitlebarRevisionSelector() {
+        // Frame-based container for the revision pop-up (similar to info button to avoid
+        // Auto Layout conflicts with the titlebar accessory clip view).
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 170, height: 22))
+
+        let popUp = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 160, height: 22), pullsDown: false)
+        popUp.controlSize = .small
+        popUp.font = NSFont.monospacedSystemFont(ofSize: 9, weight: .regular)
+        popUp.target = self
+        popUp.action = #selector(revisionPopUpAction(_:))
+        // Small bezel so it fits nicely in the title bar.
+        popUp.bezelStyle = .rounded
+
+        container.addSubview(popUp)
+        revisionPopUpButton = popUp
+
+        let accessory = NSTitlebarAccessoryViewController()
+        accessory.view = container
+        accessory.layoutAttribute = .leading
+
+        window?.addTitlebarAccessoryViewController(accessory)
+
+        // If the history list was already loaded (pre-warm), populate the menu now.
+        updateRevisionPopUpButton()
+    }
+
+    private func updateRevisionPopUpButton() {
+        guard let popUp = revisionPopUpButton else { return }
+        let menu = popUp.menu ?? NSMenu()
+        menu.removeAllItems()
+
+        if historyVersions.isEmpty {
+            let item = NSMenuItem(title: "Loading history…", action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            menu.addItem(item)
+            popUp.menu = menu
+            return
+        }
+
+        // Live / working tree (always index 0)
+        let liveItem = NSMenuItem(title: historyVersions[0].subject, action: nil, keyEquivalent: "")
+        liveItem.representedObject = 0
+        menu.addItem(liveItem)
+
+        // Historical commits (newest first after the sentinel)
+        for (idx, ver) in historyVersions.enumerated().dropFirst() {
+            let sha = ver.shortSha
+            let subj = String(ver.subject.prefix(70))
+            let title = "\(sha)  \(subj)"
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            item.representedObject = idx
+            menu.addItem(item)
+        }
+
+        popUp.menu = menu
+        updateRevisionPopUpSelection()
+    }
+
+    private func updateRevisionPopUpSelection() {
+        guard let popUp = revisionPopUpButton, let menu = popUp.menu else { return }
+        let targetIdx = currentHistoryIndex
+        for item in menu.items {
+            if let idx = item.representedObject as? Int, idx == targetIdx {
+                popUp.select(item)
+                return
+            }
+        }
+        if !menu.items.isEmpty {
+            popUp.selectItem(at: 0)
+        }
+    }
+
+    @objc private func revisionPopUpAction(_ sender: NSPopUpButton) {
+        guard let item = sender.selectedItem,
+              let index = item.representedObject as? Int else { return }
+        jumpToHistoryIndex(index)
+    }
+
+    private func jumpToHistoryIndex(_ index: Int) {
+        guard index >= 0 && index < historyVersions.count else { return }
+        let target = historyVersions[index]
+
+        if target.isWorkingTree {
+            exitHistoricalView()
+            return
+        }
+
+        // Fetch the blob for this specific revision (we don't cache all of them).
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let text = try await self.gitClient.content(at: target.sha, for: self.markdownDocument.fileURL)
+                await MainActor.run {
+                    self.applyHistoricalContent(version: target, text: text)
+                    self.currentHistoryIndex = index
+                    self.updateRevisionPopUpSelection()
+                }
+            } catch {
+                self.webViewController?.showBanner(
+                    "Could not load revision: \(error.localizedDescription)",
+                    style: .error,
+                    autoDismiss: true
+                )
+            }
+        }
     }
 
     // MARK: - Settings live-propagation (M9.3)
