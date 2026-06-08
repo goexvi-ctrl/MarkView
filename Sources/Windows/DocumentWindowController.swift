@@ -41,12 +41,30 @@ final class DocumentWindowController: NSWindowController {
     /// Active comparison (H2). When set we have loaded a synthetic side-by-side page.
     private var comparisonVersions: (left: GitVersion, right: GitVersion)?
 
+    /// Indices into historyVersions for the current left and right panes while in comparison mode.
+    private var comparisonLeftIndex: Int = 0
+    private var comparisonRightIndex: Int = 0
+
     /// The (optional) info popup panel for this window. We keep at most one per DWC
     /// so that repeated presses of the titlebar ⓘ reuse it instead of spawning multiples.
     private var currentInfoPanel: NSPanel?
 
-    /// The revision selector pop-up button in the title bar (for direct jump to any commit).
+    /// Three distinct revision selectors (as suggested to avoid any wiring/mutation issues).
+    /// - revisionPopUpButton: used only in normal / single-historical view
+    /// - leftRevisionPopUpButton / rightRevisionPopUpButton: used only in comparison mode
     private var revisionPopUpButton: NSPopUpButton?
+    private var leftRevisionPopUpButton: NSPopUpButton?
+    private var rightRevisionPopUpButton: NSPopUpButton?
+
+    /// Titlebar accessories for the revision selectors. We add/remove whole accessories
+    /// when switching modes rather than mutating one container in place.
+    private var singleRevisionAccessory: NSTitlebarAccessoryViewController?
+    private var leftRevisionAccessory: NSTitlebarAccessoryViewController?
+    private var rightRevisionAccessory: NSTitlebarAccessoryViewController?
+
+    /// The info button in the title bar. We repurpose it as an "exit comparison" button
+    /// while in side-by-side mode so there is an obvious way to return to single view.
+    private var infoButton: NSButton?
 
     init(document: MarkdownDocument) {
         self.markdownDocument = document
@@ -169,6 +187,7 @@ final class DocumentWindowController: NSWindowController {
         button.frame = NSRect(x: 6, y: 2, width: 18, height: 18)
 
         container.addSubview(button)
+        infoButton = button
 
         let accessory = NSTitlebarAccessoryViewController()
         accessory.view = container
@@ -255,6 +274,12 @@ final class DocumentWindowController: NSWindowController {
     /// Configure this controller to show a specific historical revision (used both
     /// for in-place recall and for newly opened historical snapshot windows).
     private func applyHistoricalContent(version: GitVersion, text: String) {
+        if comparisonVersions != nil {
+            // Stale single-view path while we are in comparison mode.
+            // Force the titlebar back to dual selectors and bail.
+            updateRevisionControls()
+            return
+        }
         guard let webVC = webViewController else { return }
 
         dismissInfoPanel()  // the popup was for the previous revision; it is no longer accurate
@@ -295,10 +320,15 @@ final class DocumentWindowController: NSWindowController {
             self?.handleReturnToCurrent()
         }))
 
-        self.updateRevisionPopUpSelection()
+        self.updateRevisionControls()
     }
 
     func exitHistoricalView() {
+        if comparisonVersions != nil {
+            // Stale single-view path while we are in comparison mode.
+            updateRevisionControls()
+            return
+        }
         guard isViewingHistory else { return }
         dismissInfoPanel()  // old popup is no longer accurate for the live view
 
@@ -312,7 +342,7 @@ final class DocumentWindowController: NSWindowController {
 
         webViewController?.exitHistoricalView()
 
-        self.updateRevisionPopUpSelection()
+        self.updateRevisionControls()
 
         // Note: webVC.exitHistoricalView() already does a loadDocument() for the live text
         // (with hasInitialContentLoaded forced false so it does a full loadHTMLString).
@@ -378,6 +408,50 @@ final class DocumentWindowController: NSWindowController {
     }
 
     private func performComparison(left: GitVersion, right: GitVersion) async {
+        // Ensure we have the history list so the dual titlebar selectors can be populated.
+        if historyVersions.isEmpty {
+            do {
+                historyVersions = try await gitClient.history(for: markdownDocument.fileURL, limit: 100)
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.webViewController?.showBanner(
+                        "Could not load history for comparison: \(error.localizedDescription)",
+                        style: .error, autoDismiss: true
+                    )
+                }
+                return
+            }
+        }
+
+        // Resolve indices for the two sides (used by the pop-ups).
+        if let lidx = historyVersions.firstIndex(where: { $0.sha == left.sha || ($0.isWorkingTree && left.isWorkingTree) }) {
+            comparisonLeftIndex = lidx
+        } else {
+            comparisonLeftIndex = left.isWorkingTree ? 0 : 1
+        }
+        if let ridx = historyVersions.firstIndex(where: { $0.sha == right.sha || ($0.isWorkingTree && right.isWorkingTree) }) {
+            comparisonRightIndex = ridx
+        } else {
+            comparisonRightIndex = right.isWorkingTree ? 0 : 1
+        }
+
+        // Activate comparison mode on the main actor *before* we await any content fetches.
+        // This forces the dual L+R titlebar selectors to be installed and
+        // `comparisonVersions` to be set immediately. This prevents the race where
+        // a stale single revision popup could still be clicked (and take the single-view
+        // path) while the comparison HTML was still being prepared.
+        await MainActor.run { [weak self] in
+            guard let self else { return }
+            self.comparisonVersions = (left, right)
+            self.window?.title = "\(self.markdownDocument.displayTitle) — compare \(left.shortSha) vs \(right.shortSha)"
+            self.updateRevisionControls()
+        }
+
+        // Now do the content work (the internal MainActor.run will call update again).
+        await loadComparisonContent(left: left, right: right, showBanner: true)
+    }
+
+    private func loadComparisonContent(left: GitVersion, right: GitVersion, showBanner: Bool) async {
         do {
             let leftText: String = left.isWorkingTree
                 ? self.markdownDocument.text
@@ -407,12 +481,18 @@ final class DocumentWindowController: NSWindowController {
                 self.comparisonVersions = (left, right)
                 self.window?.title = "\(self.markdownDocument.displayTitle) — compare \(left.shortSha) vs \(right.shortSha)"
                 self.webViewController?.loadComparisonHTML(html, baseURL: self.markdownDocument.fileURL.deletingLastPathComponent())
-                self.webViewController?.showBanner(
-                    "Comparison view (read-only)",
-                    style: .info,
-                    autoDismiss: false,
-                    action: ("Return to document", { [weak self] in self?.exitComparisonView() })
-                )
+
+                if showBanner {
+                    self.webViewController?.showBanner(
+                        "Comparison view (read-only)",
+                        style: .info,
+                        autoDismiss: false,
+                        action: ("Return to document", { [weak self] in self?.exitComparisonView() })
+                    )
+                }
+
+                // Ensure dual selectors are installed and show the current choices.
+                self.updateRevisionControls()
             }
         } catch {
             await MainActor.run { [weak self] in
@@ -424,12 +504,51 @@ final class DocumentWindowController: NSWindowController {
         }
     }
 
-    private func exitComparisonView() {
+    @objc private func exitComparisonView() {
         comparisonVersions = nil
         window?.title = markdownDocument.displayTitle
         webViewController?.exitComparisonView()
+        // Restore the single revision selector in the title bar.
+        updateRevisionControls()
         // For the debug "live vs first" case we return to live document.
         webViewController?.loadDocument()
+    }
+
+    // MARK: - Comparison side selection (two titlebar pop-ups)
+
+    @objc private func leftRevisionPopUpAction(_ sender: NSPopUpButton) {
+        guard let item = sender.selectedItem,
+              let index = item.representedObject as? Int else { return }
+        changeComparisonSide(isLeft: true, toIndex: index)
+    }
+
+    @objc private func rightRevisionPopUpAction(_ sender: NSPopUpButton) {
+        guard let item = sender.selectedItem,
+              let index = item.representedObject as? Int else { return }
+        changeComparisonSide(isLeft: false, toIndex: index)
+    }
+
+    private func changeComparisonSide(isLeft: Bool, toIndex index: Int) {
+        guard comparisonVersions != nil,
+              index >= 0 && index < historyVersions.count else { return }
+
+        let newVersion = historyVersions[index]
+        let otherIdx = isLeft ? comparisonRightIndex : comparisonLeftIndex
+        let otherVersion = historyVersions[otherIdx]
+
+        let newLeft = isLeft ? newVersion : otherVersion
+        let newRight = isLeft ? otherVersion : newVersion
+
+        if isLeft {
+            comparisonLeftIndex = index
+        } else {
+            comparisonRightIndex = index
+        }
+
+        // Refresh the side-by-side content (and the pop-up selections via updateRevisionControls).
+        Task { [weak self] in
+            await self?.loadComparisonContent(left: newLeft, right: newRight, showBanner: false)
+        }
     }
 
     // MARK: - History list management and keyboard-driven stepping (< > arrows)
@@ -459,7 +578,20 @@ final class DocumentWindowController: NSWindowController {
                         self.currentHistoryIndex = idx
                     }
 
-                    self.updateRevisionPopUpButton()
+                    // If we are in comparison mode, try to keep the same versions selected
+                    // even if the history list was refreshed (new commits may have been prepended).
+                    if self.comparisonVersions != nil {
+                        if let leftV = self.comparisonVersions?.left,
+                           let idx = list.firstIndex(where: { $0.sha == leftV.sha || ($0.isWorkingTree && leftV.isWorkingTree) }) {
+                            self.comparisonLeftIndex = idx
+                        }
+                        if let rightV = self.comparisonVersions?.right,
+                           let idx = list.firstIndex(where: { $0.sha == rightV.sha || ($0.isWorkingTree && rightV.isWorkingTree) }) {
+                            self.comparisonRightIndex = idx
+                        }
+                    }
+
+                    self.updateRevisionControls()
                 }
             } catch {
                 // Non-fatal for stepping; the user can still use explicit version pickers later.
@@ -484,6 +616,12 @@ final class DocumentWindowController: NSWindowController {
 
     @MainActor
     private func performHistoryStep(delta: Int, newWindow: Bool) async {
+        if comparisonVersions != nil {
+            // In comparison mode the titlebar has two selectors; ignore arrow/< > steps.
+            updateRevisionControls()
+            return
+        }
+
         // If we are on the live view, force index 0 so that plain "<" (older) from live
         // always means "go to the most recent checked-in revision".
         if !isViewingHistory {
@@ -494,7 +632,7 @@ final class DocumentWindowController: NSWindowController {
         if historyVersions.isEmpty {
             do {
                 historyVersions = try await gitClient.history(for: markdownDocument.fileURL, limit: 100)
-                updateRevisionPopUpButton()
+                updateRevisionControls()
             } catch {
                 webViewController?.showBanner(
                     "Could not load history for stepping: \(error.localizedDescription)",
@@ -716,33 +854,160 @@ final class DocumentWindowController: NSWindowController {
     // MARK: - Direct revision selection (titlebar pop-up menu)
 
     private func setupTitlebarRevisionSelector() {
-        // Frame-based container for the revision pop-up (similar to info button to avoid
-        // Auto Layout conflicts with the titlebar accessory clip view).
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 170, height: 22))
+        // Create the three distinct pop-up buttons once, each permanently wired to its
+        // own action. This avoids any risk of the wrong action being attached when we
+        // show/hide them via separate accessories.
+        ensureRevisionPopUpButtons()
 
-        let popUp = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 160, height: 22), pullsDown: false)
-        popUp.controlSize = .small
-        popUp.font = NSFont.monospacedSystemFont(ofSize: 9, weight: .regular)
-        popUp.target = self
-        popUp.action = #selector(revisionPopUpAction(_:))
-        // Small bezel so it fits nicely in the title bar.
-        popUp.bezelStyle = .rounded
-
-        container.addSubview(popUp)
-        revisionPopUpButton = popUp
-
-        let accessory = NSTitlebarAccessoryViewController()
-        accessory.view = container
-        accessory.layoutAttribute = .leading
-
-        window?.addTitlebarAccessoryViewController(accessory)
-
-        // If the history list was already loaded (pre-warm), populate the menu now.
-        updateRevisionPopUpButton()
+        // Initially we are in single-view mode, so install only the single selector.
+        updateRevisionControls()
     }
 
-    private func updateRevisionPopUpButton() {
-        guard let popUp = revisionPopUpButton else { return }
+    private func ensureRevisionPopUpButtons() {
+        if revisionPopUpButton == nil {
+            let pop = makeRevisionPopUpButton(width: 160)
+            pop.target = self
+            pop.action = #selector(revisionPopUpAction(_:))
+            revisionPopUpButton = pop
+        }
+        if leftRevisionPopUpButton == nil {
+            let pop = makeRevisionPopUpButton(width: 130)
+            pop.target = self
+            pop.action = #selector(leftRevisionPopUpAction(_:))
+            pop.toolTip = "Left side version"
+            leftRevisionPopUpButton = pop
+        }
+        if rightRevisionPopUpButton == nil {
+            let pop = makeRevisionPopUpButton(width: 130)
+            pop.target = self
+            pop.action = #selector(rightRevisionPopUpAction(_:))
+            pop.toolTip = "Right side version"
+            rightRevisionPopUpButton = pop
+        }
+    }
+
+    private func makeRevisionPopUpButton(width: CGFloat) -> NSPopUpButton {
+        let popUp = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: width, height: 22), pullsDown: false)
+        popUp.controlSize = .small
+        popUp.font = NSFont.monospacedSystemFont(ofSize: 9, weight: .regular)
+        popUp.bezelStyle = .rounded
+        return popUp
+    }
+
+    /// Reconfigures which revision selector(s) are visible in the title bar.
+    /// We maintain three distinct, permanently-wired selectors (as requested):
+    ///   - revisionPopUpButton (single action) — only visible in normal/single-historical mode
+    ///   - leftRevisionPopUpButton (left action) + rightRevisionPopUpButton (right action)
+    ///     — only visible in side-by-side comparison mode.
+    /// We add/remove whole accessories rather than mutating a shared container.
+    /// This guarantees the visible control always has the correct action attached.
+    private func updateRevisionControls() {
+        ensureRevisionPopUpButtons()
+
+        let inComparison = comparisonVersions != nil
+
+        // Remove whatever revision accessories are currently installed.
+        // We manage them as separate mode-specific accessories rather than trying
+        // to mutate subviews inside one persistent accessory. This guarantees that
+        // whichever selector is visible has the correct action permanently attached.
+        removeAllRevisionAccessories()
+
+        if inComparison {
+            // Comparison mode: only L and R selectors (no single-view one).
+            // Left accessory
+            let leftContainer = NSView(frame: NSRect(x: 0, y: 0, width: 145, height: 22))
+            let llabel = NSTextField(labelWithString: "L")
+            llabel.isEditable = false
+            llabel.isBordered = false
+            llabel.drawsBackground = false
+            llabel.font = NSFont.systemFont(ofSize: 9, weight: .medium)
+            llabel.textColor = .tertiaryLabelColor
+            llabel.frame = NSRect(x: 2, y: 4, width: 10, height: 14)
+            leftContainer.addSubview(llabel)
+
+            if let leftBtn = leftRevisionPopUpButton {
+                leftBtn.frame = NSRect(x: 14, y: 0, width: 125, height: 22)
+                leftContainer.addSubview(leftBtn)
+            }
+
+            let leftAcc = NSTitlebarAccessoryViewController()
+            leftAcc.view = leftContainer
+            leftAcc.layoutAttribute = .leading
+            window?.addTitlebarAccessoryViewController(leftAcc)
+            leftRevisionAccessory = leftAcc
+
+            // Right accessory
+            let rightContainer = NSView(frame: NSRect(x: 0, y: 0, width: 145, height: 22))
+            let rlabel = NSTextField(labelWithString: "R")
+            rlabel.isEditable = false
+            rlabel.isBordered = false
+            rlabel.drawsBackground = false
+            rlabel.font = NSFont.systemFont(ofSize: 9, weight: .medium)
+            rlabel.textColor = .tertiaryLabelColor
+            rlabel.frame = NSRect(x: 2, y: 4, width: 10, height: 14)
+            rightContainer.addSubview(rlabel)
+
+            if let rightBtn = rightRevisionPopUpButton {
+                rightBtn.frame = NSRect(x: 14, y: 0, width: 125, height: 22)
+                rightContainer.addSubview(rightBtn)
+            }
+
+            let rightAcc = NSTitlebarAccessoryViewController()
+            rightAcc.view = rightContainer
+            rightAcc.layoutAttribute = .leading
+            window?.addTitlebarAccessoryViewController(rightAcc)
+            rightRevisionAccessory = rightAcc
+
+            updateComparisonRevisionPopUps()
+            updateInfoButtonForCurrentMode()
+
+        } else {
+            // Single view mode: only the regular revision selector.
+            let container = NSView(frame: NSRect(x: 0, y: 0, width: 170, height: 22))
+
+            if let singleBtn = revisionPopUpButton {
+                singleBtn.frame = NSRect(x: 0, y: 0, width: 160, height: 22)
+                container.addSubview(singleBtn)
+            }
+
+            let acc = NSTitlebarAccessoryViewController()
+            acc.view = container
+            acc.layoutAttribute = .leading
+            window?.addTitlebarAccessoryViewController(acc)
+            singleRevisionAccessory = acc
+
+            updateRevisionPopUpButton()
+            updateInfoButtonForCurrentMode()
+        }
+    }
+
+    private func removeAllRevisionAccessories() {
+        for acc in [singleRevisionAccessory, leftRevisionAccessory, rightRevisionAccessory].compactMap({ $0 }) {
+            if let idx = window?.titlebarAccessoryViewControllers.firstIndex(where: { $0 === acc }) {
+                window?.removeTitlebarAccessoryViewController(at: idx)
+            }
+        }
+        singleRevisionAccessory = nil
+        leftRevisionAccessory = nil
+        rightRevisionAccessory = nil
+    }
+
+    private func updateInfoButtonForCurrentMode() {
+        guard let btn = infoButton else { return }
+        if comparisonVersions != nil {
+            btn.image = NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: "Exit comparison")!
+            btn.toolTip = "Return to single document view"
+            btn.action = #selector(exitComparisonView)
+        } else {
+            btn.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: "Version information")!
+            btn.toolTip = "Version information"
+            btn.action = #selector(showVersionInfoPanel)
+        }
+    }
+
+    // MARK: - Revision pop-up helpers (shared by single and dual modes)
+
+    private func populateRevisionMenu(into popUp: NSPopUpButton) {
         let menu = popUp.menu ?? NSMenu()
         menu.removeAllItems()
 
@@ -770,14 +1035,12 @@ final class DocumentWindowController: NSWindowController {
         }
 
         popUp.menu = menu
-        updateRevisionPopUpSelection()
     }
 
-    private func updateRevisionPopUpSelection() {
-        guard let popUp = revisionPopUpButton, let menu = popUp.menu else { return }
-        let targetIdx = currentHistoryIndex
+    private func selectItem(in popUp: NSPopUpButton, index: Int) {
+        guard let menu = popUp.menu else { return }
         for item in menu.items {
-            if let idx = item.representedObject as? Int, idx == targetIdx {
+            if let idx = item.representedObject as? Int, idx == index {
                 popUp.select(item)
                 return
             }
@@ -787,13 +1050,42 @@ final class DocumentWindowController: NSWindowController {
         }
     }
 
+    private func updateComparisonRevisionPopUps() {
+        guard let leftPop = leftRevisionPopUpButton,
+              let rightPop = rightRevisionPopUpButton else { return }
+        populateRevisionMenu(into: leftPop)
+        populateRevisionMenu(into: rightPop)
+        selectItem(in: leftPop, index: comparisonLeftIndex)
+        selectItem(in: rightPop, index: comparisonRightIndex)
+    }
+
+    private func updateRevisionPopUpButton() {
+        guard let popUp = revisionPopUpButton else { return }
+        populateRevisionMenu(into: popUp)
+        selectItem(in: popUp, index: currentHistoryIndex)
+    }
+
+    private func updateRevisionPopUpSelection() {
+        guard let popUp = revisionPopUpButton else { return }
+        selectItem(in: popUp, index: currentHistoryIndex)
+    }
+
     @objc private func revisionPopUpAction(_ sender: NSPopUpButton) {
+        if comparisonVersions != nil {
+            // Stale single popup while in comparison — force dual selectors back.
+            updateRevisionControls()
+            return
+        }
         guard let item = sender.selectedItem,
               let index = item.representedObject as? Int else { return }
         jumpToHistoryIndex(index)
     }
 
     private func jumpToHistoryIndex(_ index: Int) {
+        if comparisonVersions != nil {
+            updateRevisionControls()
+            return
+        }
         guard index >= 0 && index < historyVersions.count else { return }
         let target = historyVersions[index]
 
@@ -810,7 +1102,7 @@ final class DocumentWindowController: NSWindowController {
                 await MainActor.run {
                     self.applyHistoricalContent(version: target, text: text)
                     self.currentHistoryIndex = index
-                    self.updateRevisionPopUpSelection()
+                    self.updateRevisionControls()
                 }
             } catch {
                 self.webViewController?.showBanner(
