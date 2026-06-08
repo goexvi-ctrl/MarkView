@@ -11,12 +11,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let sessionKey = "LastSessionDocuments"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // 1. Files passed on the command line
+        // 1. Files passed on the command line (e.g. `./MarkView some.md` or `open -a MarkView --args some.md`).
+        //    Only treat non-option args as files if they actually exist. This prevents stray tokens
+        //    (build scripts, shell noise, "YES"/"NO", Xcode scheme args, etc.) from producing scary
+        //    "Cannot open YES" alerts.
         let fileArgs = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }
         for arg in fileArgs {
             let url = URL(fileURLWithPath: arg).standardizedFileURL
-            DocumentWindowRegistry.shared.openDocument(url: url)
-            documentOpened = true
+            if FileManager.default.fileExists(atPath: url.path) {
+                DocumentWindowRegistry.shared.openDocument(url: url)
+                documentOpened = true
+            } else {
+                // Common when launched from ksh, scripts, Xcode, or certain terminal integrations.
+                NSLog("MarkView: ignoring non-existent command-line argument: %@", arg)
+            }
         }
 
         if !documentOpened {
@@ -108,6 +116,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for url in panel.urls {
             documentOpened = true
             DocumentWindowRegistry.shared.openDocument(url: url)
+        }
+    }
+
+    @objc func reloadDocument(_ sender: Any?) {
+        if let controller = DocumentWindowRegistry.shared.focusedController() {
+            controller.reloadCurrentDocument()
         }
     }
 }

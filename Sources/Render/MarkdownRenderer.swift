@@ -1,35 +1,29 @@
 import Foundation
 import CmarkGFM
-import BeautifulMermaid
 import AppKit
 
 // Converts a MarkdownDocument to an HTML body string using cmark-gfm.
 // Plain text files bypass the Markdown pipeline entirely (D-5.7).
 enum MarkdownRenderer {
 
-    static func render(document: MarkdownDocument, allowUnsafeHTML: Bool = false,
-                       isDark: Bool = false) -> String {
+    static func render(document: MarkdownDocument, allowUnsafeHTML: Bool = false) -> String {
         switch document.fileType {
         case .plainText:
             return renderPlainText(document.text)
         case .markdown:
-            return renderMarkdown(document.text, allowUnsafeHTML: allowUnsafeHTML, isDark: isDark)
+            return renderMarkdown(document.text, allowUnsafeHTML: allowUnsafeHTML)
         }
     }
 
     // MARK: - Markdown (cmark-gfm, D-5.1)
 
-    static func renderMarkdown(_ text: String, allowUnsafeHTML: Bool = false,
-                               isDark: Bool = false) -> String {
+    static func renderMarkdown(_ text: String, allowUnsafeHTML: Bool = false) -> String {
         cmark_gfm_core_extensions_ensure_registered()
 
-        // 1. Render mermaid blocks natively (before cmark sees them).
-        //    Each block is replaced with an HTML comment placeholder; the SVG
-        //    is injected after sanitisation so SVG tags are never stripped.
-        let (textNM, mermaidSVGs) = extractMermaidBlocks(text, isDark: isDark)
-
-        // 2. Protect $$...$$ from cmark's Markdown processing.
-        let protected = protectMathBackslashes(textNM)
+        // 1. Protect $$...$$ from cmark's Markdown processing.
+        //    (Mermaid fenced blocks pass through as normal code blocks for
+        //    client-side rendering with the real mermaid.js library.)
+        let protected = protectMathBackslashes(text)
 
         // Always enable CMARK_OPT_UNSAFE so raw HTML (including the math <div>
         // blocks inserted above) is passed through rather than replaced with a
@@ -67,113 +61,14 @@ enum MarkdownRenderer {
         // 3. Sanitise.
         if !allowUnsafeHTML { html = HTMLSanitizer.sanitize(html) }
 
-        // 4. Inject native mermaid SVGs (after sanitisation — SVG is trusted content).
-        for (placeholder, svg) in mermaidSVGs {
-            html = html.replacingOccurrences(
-                of: placeholder,
-                with: "<div class=\"mermaid-native\">\(svg)</div>"
-            )
+        // Robustness: if cmark produced nothing (e.g. unexpected parse issue with
+        // certain fenced blocks or edge cases), fall back to showing the raw text.
+        // This prevents completely blank windows.
+        if html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            html = "<pre class=\"plain-text\">\(htmlEscape(text))</pre>"
         }
+
         return html
-    }
-
-    // MARK: - Native Mermaid rendering
-
-    // Both a light and dark SVG are rendered for every diagram.
-    // CSS @media (prefers-color-scheme) selects which one to display,
-    // so the diagram is always correct regardless of when/how appearance
-    // is detected in Swift — and no reload is needed on theme change.
-    //
-    // Colours are spelled out explicitly because the DiagramTheme
-    // mixed() helper silently produces black on AppKit when usingColorSpace
-    // returns nil (calibratedRGB → deviceRGB can fail in certain call paths).
-    private static let mermaidLightTheme = DiagramTheme(
-        background: BMColor(hex: "#ffffff"),
-        foreground: BMColor(hex: "#1f2328"),
-        line:    BMColor(hex: "#57606a"),   // visible medium gray
-        accent:  BMColor(hex: "#0969da"),
-        muted:   BMColor(hex: "#636c76"),
-        surface: BMColor(hex: "#eaeef2"),   // clearly visible light node fill
-        border:  BMColor(hex: "#d0d7de"),
-        transparent: true                   // no SVG canvas fill; page CSS sets bg
-    )
-
-    private static let mermaidDarkTheme = DiagramTheme(
-        background: BMColor(hex: "#0d1117"),
-        foreground: BMColor(hex: "#e6edf3"),
-        line:    BMColor(hex: "#8b949e"),
-        accent:  BMColor(hex: "#4493f8"),
-        muted:   BMColor(hex: "#9198a1"),
-        surface: BMColor(hex: "#21262d"),   // clearly visible dark node fill
-        border:  BMColor(hex: "#30363d"),
-        transparent: true
-    )
-
-    private static func extractMermaidBlocks(
-        _ source: String,
-        isDark: Bool           // kept for API compatibility; both variants always rendered
-    ) -> (processedSource: String, svgs: [(placeholder: String, svg: String)]) {
-        var result = ""
-        var svgs: [(String, String)] = []
-        var idx = source.startIndex
-        var diagramCount = 0
-
-        while idx < source.endIndex {
-            let atLineStart = idx == source.startIndex
-                || source[source.index(before: idx)] == "\n"
-
-            if atLineStart, source[idx...].hasPrefix("```mermaid") {
-                if let eol = source[idx...].firstIndex(of: "\n") {
-                    let bodyStart = source.index(after: eol)
-                    var search = bodyStart
-                    var found: (body: Substring, afterFence: String.Index)?
-                    while search < source.endIndex {
-                        let lineStart = search
-                        if let lineEnd = source[search...].firstIndex(of: "\n") {
-                            let line = source[lineStart..<lineEnd]
-                            if line.trimmingCharacters(in: .whitespaces) == "```" {
-                                found = (source[bodyStart..<lineStart],
-                                         source.index(after: lineEnd))
-                                break
-                            }
-                            search = source.index(after: lineEnd)
-                        } else {
-                            let line = source[lineStart...]
-                            if line.trimmingCharacters(in: .whitespaces) == "```" {
-                                found = (source[bodyStart..<lineStart], source.endIndex)
-                            }
-                            break
-                        }
-                    }
-
-                    if let (body, afterFence) = found {
-                        let src = String(body).trimmingCharacters(in: .whitespacesAndNewlines)
-                        let placeholder = "<!--MERMAID_\(diagramCount)-->"
-                        do {
-                            let lightSVG = try MermaidRenderer.renderSVG(source: src, theme: mermaidLightTheme)
-                            let darkSVG  = try MermaidRenderer.renderSVG(source: src, theme: mermaidDarkTheme)
-                            // Both variants are embedded; CSS picks the right one.
-                            let combined = """
-                            <div class="mermaid-native mermaid-scheme-light">\(lightSVG)</div>\
-                            <div class="mermaid-native mermaid-scheme-dark">\(darkSVG)</div>
-                            """
-                            svgs.append((placeholder, combined))
-                            result += "\n\(placeholder)\n"
-                        } catch {
-                            // Unsupported diagram type — leave original code block
-                            result += source[idx..<afterFence]
-                        }
-                        idx = afterFence
-                        diagramCount += 1
-                        continue
-                    }
-                }
-            }
-
-            result.append(source[idx])
-            idx = source.index(after: idx)
-        }
-        return (result, svgs)
     }
 
     // MARK: - Plain text (D-5.7)

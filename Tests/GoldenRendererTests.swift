@@ -1,5 +1,5 @@
 // Golden renderer tests — compiled only in the Xcode test bundle (MarkViewTests.xctest)
-// where the full MarkView module (including cmark-gfm + BeautifulMermaid) is available.
+// where the full MarkView module (including cmark-gfm) is available.
 // NOT included in the SPM MarkViewCore target.
 
 #if canImport(CmarkGFM)

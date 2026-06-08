@@ -172,8 +172,35 @@ pre.plain-text {
   font-size: 0.9em;
 }
 
-/* Mermaid diagrams */
-.mermaid { text-align: center; margin: 1em 0; }
+/* Mermaid diagrams (rendered by client-side mermaid.js) */
+.mermaid {
+  text-align: center;
+  margin: 1.25em 0;
+}
+.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Visible fallback when a mermaid diagram fails to render via the JS engine.
+   Shows the original source so the user at least has something (and can copy it). */
+.mermaid-fallback {
+  background: var(--color-pre-bg);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  padding: 0.8em 1em;
+  margin: 1em 0;
+  font-size: 0.85em;
+  overflow-x: auto;
+  text-align: left;
+}
+.mermaid-fallback code {
+  font-family: var(--code-font, ui-monospace, monospace);
+  white-space: pre;
+}
+.mermaid-fallback > div {
+  font-family: var(--body-font, -apple-system, sans-serif);
+}
 
 /* Code block toolbar (M7) */
 .code-toolbar {
@@ -204,16 +231,4 @@ pre:hover .code-toolbar { opacity: 1; }
   overflow-x: auto;
 }
 
-/* Native Mermaid diagram wrapper (rendered in Swift via BeautifulMermaid) */
-.mermaid-native {
-  text-align: center;
-  margin: 1.5em 0;
-  overflow-x: auto;
-}
-.mermaid-native svg {
-  max-width: 100%;
-  height: auto;
-}
-/* Show only the theme-appropriate SVG variant */
-@media (prefers-color-scheme: light) { .mermaid-scheme-dark  { display: none; } }
-@media (prefers-color-scheme: dark)  { .mermaid-scheme-light { display: none; } }
+
