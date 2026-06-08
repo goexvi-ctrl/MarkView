@@ -239,11 +239,18 @@ phasing (A then B then C), and constraints from Design.md.
   ("Viewing <short> - <subject>") with "Return to current version" action.
   Suspend FileWatcher while viewing history; title augmentation. Return restores
   live disk content + re-arms watcher.
-- [NEW] H1.4 "Open this historical revision in a new window" (synthetic identity
+- [CODED] H1.4 "Open this historical revision in a new window" (synthetic identity
   so it does not collide with the live DocumentKey in the registry).
-- [CODED] H1.5 Manual smoke + error cases for H1 (no git, untracked, huge blob,
+  Keyboard Shift-< / Shift-> (and Arrow / , . equivalents) opens independent
+  pure-historical snapshot windows that can coexist with the live viewer for
+  the same document. Revision pop-up performs in-place jumps (current behavior
+  accepted for H1; selector re-used for H2 version picking).
+- [TESTED] H1.5 Manual smoke + error cases for H1 (no git, untracked, huge blob,
   lossy decode of old content, etc.). Debug menu item ("Debug: View First Historical (git)")
-  provides immediate test coverage. Update smoke checklist (X.2) as needed.
+  provides immediate test coverage. Key flows (in-place < >, Shift new windows,
+  fast-path from live, WT sentinel exit, revision selector, info panel reuse +
+  auto-dismiss on revision change, Return-to-current for both normal and pure
+  snapshots) exercised via Xcode console logs + debug menu. Updated X.2 checklist.
 - [NEW] H2.1 (after H1) GitClient diff support + small unified-diff hunk parser.
 - [NEW] H2.2 Basic side-by-side comparison surface (new window or synthetic diff
   HTML page loaded into the webview) showing two rendered versions side-by-side
@@ -268,9 +275,15 @@ phasing (A then B then C), and constraints from Design.md.
   - Xcode suite: GoldenRendererTests.swift added (16 tests covering cmark-gfm
     output, sanitizer, math pre-processing, plain-text path). Runs as host-app
     bundle test against the full MarkView module.
-- [NEW] X.2 Manual smoke checklist (D-17) passes: live reload, window dedup,
+- [CODED] X.2 Manual smoke checklist (D-17) passes: live reload, window dedup,
   zoom persistence, per-block toggle/copy, settings live-update, external link
-  to browser, internal anchor scroll.
+  to browser, internal anchor scroll, git history navigation (< > / , . in-place
+  from live into history and back; Shift for new independent snapshot windows),
+  titlebar revision selector (scrollable NSPopUp with short SHA + commit message
+  prefix; direct jump), info panel (ⓘ button: single reusable per window, shows
+  full commit message or "Live", auto-dismisses on revision change), Return to
+  current banner action (normal exit + special adopt/close logic for pure
+  historical snapshots), graceful no-git / untracked cases.
 - [DONE] X.3 No remote network fetch except remote images (all libs bundled).
   - All JS/CSS vendored in WebAssets/vendor/. Mermaid rendered in-page via the
     vendored mermaid.js (no CDN). No network calls for any rich content at runtime.
