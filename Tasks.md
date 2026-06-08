@@ -162,54 +162,58 @@ Keep this file ASCII-only.
 
 - Dark mode polish pass. Basic `@media (prefers-color-scheme: dark)` CSS variables
   are in place in theme.css, but no systematic verification or visual polish has
-  been done. Mermaid diagrams (BUG-1) will also need re-testing once that bug is
-  resolved.
+  been done. Mermaid now re-renders on appearance changes via the JS path.
 
 ---
 
 ## Known Bugs
 
-- [NEW] BUG-2 Pinch-to-zoom on WKWebView does not give live (during-gesture) visual
-  feedback on macOS 15. The zoom value is stored correctly and appears after the next
-  user interaction (click/scroll), but the view does not update while pinching.
+- [PARTIALLY FIXED] BUG-2 Pinch-to-zoom (magnifying-glass visual scale of current
+  layout) is now functional via WKWebView's native magnification (allowsMagnification=true
+  + built-in gesture recognizer). This is deliberately separate from the reflow
+  "font size" zoom (CSS --zoom variable on html font-size, which affects layout,
+  shrink-to-fit code blocks, etc.).
 
-  Three approaches were tried, all failed:
+  Menu support under View (added in this session):
+  - Zoom In / Zoom Out / Actual Size (drive native magnification; use Cmd+Shift
+    equivalents to avoid clashing with font-size commands).
+  - Increase Font Size / Decrease Font Size / Actual Font Size (the original
+    reflow path via setZoom / JS --zoom; Cmd without Shift).
 
-  1. webView.pageZoom during .changed — pageZoom is processed asynchronously by the
-     WebKit GPU process (com.apple.WebKit.GPU). Setting it sends an IPC message; the
-     new frame does not arrive until after the gesture is complete.
+  Independent resets are provided ("Actual Size" for visual magnification;
+  "Actual Font Size" for the reflow zoom). This was chosen over a single combined
+  reset.
 
-  2. evaluateJavaScript("document.documentElement.style.transform=...") during .changed
-     — also async IPC to the WebContent process. WebKit appears to suspend rendering
-     updates while a gesture recognizer on the WKWebView itself is active.
+  Menu zoom (Cmd+/- / 0) was historically tied only to the reflow path (sometimes
+  labeled "font size"). Pinch previously did almost nothing useful, or (after an
+  earlier mistaken custom gesture implementation) would incorrectly drive the
+  reflow zoom, produce selection-dependent snapping, and only have effect for one
+  gesture after highlighting text.
 
-  3. CALayer transform on a plain NSView container (wantsLayer=true) wrapping the
-     WKWebView, with the gesture recognizer on the container instead of the WebView.
-     The expectation was that CA would composite the WKWebView's IOSurface with the
-     transform immediately on the display link tick. This also did not produce live
-     feedback; the display update was still deferred until a subsequent user action.
+  Live (during-gesture) visual feedback for the magnification path may still be
+  limited or absent (see original platform notes below); final value applies on
+  gesture end. The old experimental attempts (pageZoom, JS transform during
+  .changed, CALayer wrapper) are no longer relevant since we now rely on native
+  magnification for the visual path.
 
-  The gesture recognizer fires correctly (.began/.changed/.ended all fire) and the
-  final value is applied correctly. Only the live intermediate frames are missing.
+  (Mermaid diagrams remain broken / non-functional per separate note; not addressed
+  in this session.)
 
-  Possible future investigation paths:
-  - NSScrollView with allowsMagnification=true as the outer view; let the scroll
-    view handle the pinch gesture natively (NSScrollView.magnification is synchronous).
-    Challenge: WKWebView has its own internal NSScrollView which may conflict.
-  - Look for a WKWebView-specific API to suspend/resume rendering or to request a
-    synchronous composite. Check whether WKWebView.allowsMagnification exists in
-    future WebKit versions.
-  - Use a private/undocumented WKWebView API to intercept the existing magnification
-    gesture handler that WebKit installs internally.
-  - File a DTS or Feedback Assistant ticket with Apple — this appears to be a
-    platform-level restriction with no documented workaround.
+  Live (during-gesture) visual feedback for the magnification path may still be
+  limited or absent due to WebKit's asynchronous rendering and gesture handling
+  (see historical platform notes in prior version of this entry). The final
+  magnification value applies on gesture end.
 
-- [NEW] BUG-1 Mermaid diagrams render with black node fills and invisible lines.
-  Root cause: BeautifulMermaid `DiagramTheme.mixed()` silently returns black on
-  AppKit when NSColor colour-space conversion fails. Workaround of explicit
-  surface/line colours partially improves appearance but diagram quality is
-  still below acceptable. Investigate alternate rendering path or wait for a
-  BeautifulMermaid fix. All three diagram types affected (flow, sequence, ER).
+  (Mermaid diagrams remain broken / non-functional per separate note; not addressed
+  in this session.)
+
+- [DONE] BUG-1 (was) Mermaid diagrams rendered via BeautifulMermaid (a from-scratch
+  reimplementation) produced poor results and only supported a subset of syntax.
+  Fixed by restoring client-side rendering with the real vendored mermaid.js
+  (as originally specified in Design.md 5.4). Diagrams now use the reference
+  engine for full syntax support and high visual fidelity. Theme switches
+  re-render diagrams in JS without a full document reload. The BeautifulMermaid
+  package is no longer imported or used.
 
 ---
 
@@ -224,5 +228,5 @@ Keep this file ASCII-only.
   zoom persistence, per-block toggle/copy, settings live-update, external link
   to browser, internal anchor scroll.
 - [DONE] X.3 No remote network fetch except remote images (all libs bundled).
-  - All JS/CSS vendored in WebAssets/vendor/. Mermaid.js removed from template;
-    Mermaid rendered natively via BeautifulMermaid. No CDN calls at runtime.
+  - All JS/CSS vendored in WebAssets/vendor/. Mermaid rendered in-page via the
+    vendored mermaid.js (no CDN). No network calls for any rich content at runtime.

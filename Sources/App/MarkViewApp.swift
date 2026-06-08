@@ -34,7 +34,29 @@ struct MarkViewApp: App {
                 .keyboardShortcut("/", modifiers: .command)
             }
 
-            // View zoom commands
+            // Visual zoom (magnifying glass / pinch-to-zoom equivalent).
+            // Scales the current layout visually without reflowing text or affecting
+            // shrink-to-fit code blocks.
+            CommandGroup(after: .toolbar) {
+                Button("Zoom In") {
+                    visualZoomIn()
+                }
+                .keyboardShortcut("=", modifiers: [.command, .shift])
+
+                Button("Zoom Out") {
+                    visualZoomOut()
+                }
+                .keyboardShortcut("-", modifiers: [.command, .shift])
+
+                Button("Actual Size") {
+                    visualZoomReset()
+                }
+                .keyboardShortcut("0", modifiers: [.command, .shift])
+            }
+
+            // Font size / reflow zoom.
+            // Changes the effective font size (via --zoom CSS), causing layout reflow
+            // and affecting code block shrink-to-fit behavior.
             CommandGroup(after: .toolbar) {
                 Button("Increase Font Size") {
                     zoomIn()
@@ -46,10 +68,19 @@ struct MarkViewApp: App {
                 }
                 .keyboardShortcut("-", modifiers: .command)
 
-                Button("Actual Size") {
+                Button("Actual Font Size") {
                     zoomReset()
                 }
                 .keyboardShortcut("0", modifiers: .command)
+            }
+
+            // Reload (useful for debugging with Web Inspector attached,
+            // since closing the window would close the inspector too).
+            CommandGroup(after: .toolbar) {
+                Button("Reload") {
+                    NSApp.sendAction(#selector(AppDelegate.reloadDocument(_:)), to: nil, from: nil)
+                }
+                .keyboardShortcut("r", modifiers: .command)
             }
         }
     }

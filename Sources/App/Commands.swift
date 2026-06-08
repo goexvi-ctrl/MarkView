@@ -28,6 +28,36 @@ func zoomReset() {
     ctrl.setZoom(1.0)
 }
 
+// Visual (magnifying glass) zoom - separate from font size / reflow zoom.
+// This drives WKWebView.magnification for pure visual scale without layout reflow.
+private let visualZoomMin: CGFloat = 0.25
+private let visualZoomMax: CGFloat = 5.0
+private let visualZoomStep: CGFloat = 0.10
+
+private func clampedVisualZoom(_ v: CGFloat) -> CGFloat {
+    min(max(v, visualZoomMin), visualZoomMax)
+}
+
+@MainActor
+func visualZoomIn() {
+    guard let ctrl = DocumentWindowRegistry.shared.focusedController() else { return }
+    let current = ctrl.visualZoomFactor
+    ctrl.setVisualZoom(clampedVisualZoom(current * (1 + visualZoomStep)))
+}
+
+@MainActor
+func visualZoomOut() {
+    guard let ctrl = DocumentWindowRegistry.shared.focusedController() else { return }
+    let current = ctrl.visualZoomFactor
+    ctrl.setVisualZoom(clampedVisualZoom(current / (1 + visualZoomStep)))
+}
+
+@MainActor
+func visualZoomReset() {
+    guard let ctrl = DocumentWindowRegistry.shared.focusedController() else { return }
+    ctrl.setVisualZoom(1.0)
+}
+
 // MARK: - Target-action handlers on AppDelegate (first responder chain)
 
 extension AppDelegate {
@@ -45,5 +75,17 @@ extension AppDelegate {
 
     @IBAction func performZoomReset(_ sender: Any?) {
         MarkView.zoomReset()
+    }
+
+    @IBAction func performVisualZoomIn(_ sender: Any?) {
+        MarkView.visualZoomIn()
+    }
+
+    @IBAction func performVisualZoomOut(_ sender: Any?) {
+        MarkView.visualZoomOut()
+    }
+
+    @IBAction func performVisualZoomReset(_ sender: Any?) {
+        MarkView.visualZoomReset()
     }
 }

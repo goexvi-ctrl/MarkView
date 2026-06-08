@@ -87,6 +87,22 @@ final class DocumentWindowController: NSWindowController {
         webViewController?.setZoom(factor)
     }
 
+    // Visual magnification (separate from the reflow font-size zoom).
+    // This controls WKWebView's native magnification for "magnifying glass" zoom.
+    var visualZoomFactor: CGFloat {
+        webViewController?.magnification ?? 1.0
+    }
+
+    func setVisualZoom(_ factor: CGFloat) {
+        webViewController?.setMagnification(factor)
+    }
+
+    // Support for Cmd-R / manual reload while keeping the window (and attached
+    // Web Inspector) open.
+    func reloadCurrentDocument() {
+        webViewController?.reloadCurrentDocument()
+    }
+
     // MARK: - Settings live-propagation (M9.3)
 
     private func setupSettingsObserver() {

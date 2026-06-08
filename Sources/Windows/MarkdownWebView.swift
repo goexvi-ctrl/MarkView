@@ -32,6 +32,36 @@ final class MarkdownWebViewController: NSViewController {
         webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = coordinator
         webView.uiDelegate = coordinator
+
+        // Allow Safari Web Inspector attachment (required on macOS 13.3+ / recent Safari
+        // for standalone apps using WKWebView). Only enable in debug builds.
+        #if DEBUG
+        if #available(macOS 13.3, *) {
+            webView.isInspectable = true
+        }
+        #endif
+
+        // Enable WKWebView's native magnification gesture.
+        // This provides "pinch-to-zoom" as a pure visual / magnifying-glass scale
+        // of the current layout (no reflow of fonts, no change to our --zoom CSS var,
+        // no impact on shrink-to-fit logic).
+        //
+        // This is deliberately separate from the menu-driven Cmd+/- zoom (which uses
+        // the CSS --zoom variable to change effective font sizes and cause reflow).
+        // See user clarification and BUG-2 in Tasks.md.
+        webView.allowsMagnification = true
+
+        // We do NOT add a custom NSMagnificationGestureRecognizer that drives
+        // our CSS setZoom(). Doing so caused the exact symptoms reported:
+        // - Pinch incorrectly affected font-size/reflow instead of pure visual scale.
+        // - Glitchy snapping (especially around text selection).
+        // - Effect only after selecting text (likely because selection + our JS
+        //   style manipulation or shrink-fit recompute was fighting the gesture).
+        //
+        // Native magnification is the correct semantic for "pinch like a magnifying
+        // glass". It is independent of our reflow zoom and should not depend on
+        // text selection state.
+
         self.view = webView
     }
 
@@ -73,6 +103,34 @@ final class MarkdownWebViewController: NSViewController {
     // Large-file threshold: render off the main thread above this character count.
     private static let asyncRenderThreshold = 100_000
 
+    // Once we have done the initial full loadHTMLString, subsequent reloads
+    // (Cmd-R, FileWatcher, etc.) use JS to replace only the article content.
+    // This keeps the shell (scripts, styles, inspector state) stable and avoids
+    // the duplicated head/body garbage that full re-loads can produce in WKWebView.
+    private var hasInitialContentLoaded = false
+
+    #if DEBUG
+    /// Writes the generated HTML (full document or just the inner body fragment)
+    /// next to the source document for easy comparison with what the Web Inspector shows.
+    /// This is only for debugging the "blank window / empty article" problem.
+    private func debugDumpHTML(fullHTML: String? = nil, bodyFragment: String? = nil, sourceURL: URL) {
+        let dir = sourceURL.deletingLastPathComponent()
+        let ts = Int(Date().timeIntervalSince1970)
+        let base = dir.appendingPathComponent("MarkView-debug-\(ts)").path
+
+        if let full = fullHTML {
+            let path = base + "-full.html"
+            try? full.write(toFile: path, atomically: true, encoding: .utf8)
+            NSLog("[MarkView] DEBUG: wrote FULL HTML passed to loadHTMLString → %@", path)
+        }
+        if let frag = bodyFragment {
+            let path = base + "-body.html"
+            try? frag.write(toFile: path, atomically: true, encoding: .utf8)
+            NSLog("[MarkView] DEBUG: wrote BODY FRAGMENT from renderer → %@", path)
+        }
+    }
+    #endif
+
     func loadDocument() {
         dismissBanner()
         renderAndLoad(restoreScrollY: nil)
@@ -92,33 +150,74 @@ final class MarkdownWebViewController: NSViewController {
         let newNonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
         nonce = newNonce
 
-        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let isUpdate = hasInitialContentLoaded
 
         if doc.text.count > Self.asyncRenderThreshold {
-            // Off-main render: only the cmark-gfm/mermaid work is heavy.
-            // HTMLTemplate.build (settings access) runs back on main actor.
+            // Off-main render for large files (cmark-gfm work).
             Task.detached(priority: .userInitiated) {
-                let body = MarkdownRenderer.render(document: doc, isDark: isDark)
+                let body = MarkdownRenderer.render(document: doc)
                 await MainActor.run { [weak self] in
                     guard let self, self.nonce == newNonce else { return }
-                    let html = HTMLTemplate.build(
-                        body: body, settings: settings,
-                        zoomFactor: zoom, nonce: newNonce
+                    #if DEBUG
+                    self.debugDumpHTML(
+                        fullHTML: isUpdate ? nil : HTMLTemplate.build(body: body, settings: settings, zoomFactor: zoom, nonce: newNonce),
+                        bodyFragment: body,
+                        sourceURL: doc.fileURL
                     )
-                    if let y = restoreScrollY { self.coordinator.pendingScrollRestore = y }
-                    self.webView.loadHTMLString(html, baseURL: doc.fileURL)
-                    self.showEncodingBannerIfNeeded(for: doc)
+                    #endif
+
+                    if isUpdate {
+                        // Stable update path: only replace the article inner content.
+                        let escaped = body.jsEscaped()
+                        let js = "replaceDocumentContent(\"\(escaped)\")"
+                        self.webView.evaluateJavaScript(js) { _, _ in
+                            if let y = restoreScrollY { self.coordinator.pendingScrollRestore = y }
+                        }
+                    } else {
+                        let html = HTMLTemplate.build(
+                            body: body, settings: settings,
+                            zoomFactor: zoom, nonce: newNonce
+                        )
+                        if let y = restoreScrollY { self.coordinator.pendingScrollRestore = y }
+                        // Use the *directory* containing the .md as baseURL (not the .md file itself).
+                        // Using the file URL as base can cause the WebContent process to try to
+                        // "open" the .md file as a subresource (leading to the "Cannot open file"
+                        // errors you are seeing in the inspector). The directory still resolves
+                        // relative images/links correctly.
+                        let baseURL = doc.fileURL.deletingLastPathComponent()
+                        self.webView.loadHTMLString(html, baseURL: baseURL)
+                        self.hasInitialContentLoaded = true
+                        self.showEncodingBannerIfNeeded(for: doc)
+                    }
                 }
             }
         } else {
-            let body = MarkdownRenderer.render(document: doc, isDark: isDark)
-            let html = HTMLTemplate.build(
-                body: body, settings: settings,
-                zoomFactor: zoom, nonce: newNonce
+            let body = MarkdownRenderer.render(document: doc)
+            #if DEBUG
+            self.debugDumpHTML(
+                fullHTML: isUpdate ? nil : HTMLTemplate.build(body: body, settings: settings, zoomFactor: zoom, nonce: newNonce),
+                bodyFragment: body,
+                sourceURL: doc.fileURL
             )
-            if let y = restoreScrollY { coordinator.pendingScrollRestore = y }
-            webView.loadHTMLString(html, baseURL: doc.fileURL)
-            showEncodingBannerIfNeeded(for: doc)
+            #endif
+
+            if isUpdate {
+                let escaped = body.jsEscaped()
+                let js = "replaceDocumentContent(\"\(escaped)\")"
+                webView.evaluateJavaScript(js) { _, _ in
+                    if let y = restoreScrollY { self.coordinator.pendingScrollRestore = y }
+                }
+            } else {
+                let html = HTMLTemplate.build(
+                    body: body, settings: settings,
+                    zoomFactor: zoom, nonce: newNonce
+                )
+                if let y = restoreScrollY { self.coordinator.pendingScrollRestore = y }
+                let baseURL = doc.fileURL.deletingLastPathComponent()
+                webView.loadHTMLString(html, baseURL: baseURL)
+                hasInitialContentLoaded = true
+                showEncodingBannerIfNeeded(for: doc)
+            }
         }
     }
 
@@ -132,8 +231,7 @@ final class MarkdownWebViewController: NSViewController {
     }
 
     private func buildHTML() -> String {
-        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let body = MarkdownRenderer.render(document: document, isDark: isDark)
+        let body = MarkdownRenderer.render(document: document)
         return HTMLTemplate.build(
             body: body,
             settings: SettingsStore.shared,
@@ -147,6 +245,16 @@ final class MarkdownWebViewController: NSViewController {
     func setZoom(_ factor: Double) {
         currentZoom = factor
         webView.evaluateJavaScript("setZoom(\(factor))", completionHandler: nil)
+    }
+
+    // Visual magnification (pinch / magnifying glass zoom).
+    // Independent of the CSS reflow zoom (currentZoom / --zoom).
+    var magnification: CGFloat {
+        webView.magnification
+    }
+
+    func setMagnification(_ factor: CGFloat) {
+        webView.magnification = factor
     }
 
     func captureScrollPosition(completion: @escaping @MainActor (Double) -> Void) {
@@ -166,15 +274,38 @@ final class MarkdownWebViewController: NSViewController {
     }
 
     func setAppearance(_ isDark: Bool) {
-        // Update the CSS theme via JS (handles non-mermaid content instantly)
+        // CSS variables + mermaid re-render happen in JS; no full document reload needed.
         let mode = isDark ? "dark" : "light"
         webView.evaluateJavaScript("setAppearance('\(mode)')", completionHandler: nil)
-        // Re-render the document so native mermaid diagrams use the new theme
-        reload(document: document, restoreScrollY: lastScrollY)
     }
 
     func scrollToAnchor(_ slug: String) {
         let escaped = slug.replacingOccurrences(of: "'", with: "\\'")
         webView.evaluateJavaScript("scrollToAnchor('\(escaped)')", completionHandler: nil)
+    }
+
+    // Manual reload support (e.g. Cmd-R) so the user can force a re-render
+    // while keeping the window and Web Inspector open.
+    func reloadCurrentDocument() {
+        let url = document.fileURL
+        do {
+            let fresh = try MarkdownDocument(url: url)
+            reload(document: fresh, restoreScrollY: lastScrollY)
+        } catch {
+            showBanner("Reload failed: \(error.localizedDescription)", style: .error, autoDismiss: true)
+        }
+    }
+}
+
+// Safe escaping for injecting an HTML fragment as a JS string literal from Swift.
+private extension String {
+    func jsEscaped() -> String {
+        return self
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+            .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
     }
 }
