@@ -2,6 +2,12 @@ import AppKit
 import WebKit
 import Combine
 
+/// Global debug flags for developer diagnostics. All default to false (off).
+enum DebugFlags {
+    /// When true, MarkdownWebView writes MarkView-debug-*.html files next to the source document.
+    @MainActor static var dumpHTML = false
+}
+
 // NSViewController that owns the WKWebView for a single document window.
 @MainActor
 final class MarkdownWebViewController: NSViewController {
@@ -109,10 +115,9 @@ final class MarkdownWebViewController: NSViewController {
     // the duplicated head/body garbage that full re-loads can produce in WKWebView.
     private var hasInitialContentLoaded = false
 
-    #if DEBUG
     /// Writes the generated HTML (full document or just the inner body fragment)
     /// next to the source document for easy comparison with what the Web Inspector shows.
-    /// This is only for debugging the "blank window / empty article" problem.
+    /// Gated by DebugFlags.dumpHTML (off by default).
     private func debugDumpHTML(fullHTML: String? = nil, bodyFragment: String? = nil, sourceURL: URL) {
         let dir = sourceURL.deletingLastPathComponent()
         let ts = Int(Date().timeIntervalSince1970)
@@ -129,7 +134,6 @@ final class MarkdownWebViewController: NSViewController {
             NSLog("[MarkView] DEBUG: wrote BODY FRAGMENT from renderer → %@", path)
         }
     }
-    #endif
 
     func loadDocument() {
         dismissBanner()
@@ -158,13 +162,13 @@ final class MarkdownWebViewController: NSViewController {
                 let body = MarkdownRenderer.render(document: doc)
                 await MainActor.run { [weak self] in
                     guard let self, self.nonce == newNonce else { return }
-                    #if DEBUG
-                    self.debugDumpHTML(
-                        fullHTML: isUpdate ? nil : HTMLTemplate.build(body: body, settings: settings, zoomFactor: zoom, nonce: newNonce),
-                        bodyFragment: body,
-                        sourceURL: doc.fileURL
-                    )
-                    #endif
+                    if DebugFlags.dumpHTML {
+                        self.debugDumpHTML(
+                            fullHTML: isUpdate ? nil : HTMLTemplate.build(body: body, settings: settings, zoomFactor: zoom, nonce: newNonce),
+                            bodyFragment: body,
+                            sourceURL: doc.fileURL
+                        )
+                    }
 
                     if isUpdate {
                         // Stable update path: only replace the article inner content.
@@ -193,13 +197,13 @@ final class MarkdownWebViewController: NSViewController {
             }
         } else {
             let body = MarkdownRenderer.render(document: doc)
-            #if DEBUG
-            self.debugDumpHTML(
-                fullHTML: isUpdate ? nil : HTMLTemplate.build(body: body, settings: settings, zoomFactor: zoom, nonce: newNonce),
-                bodyFragment: body,
-                sourceURL: doc.fileURL
-            )
-            #endif
+            if DebugFlags.dumpHTML {
+                self.debugDumpHTML(
+                    fullHTML: isUpdate ? nil : HTMLTemplate.build(body: body, settings: settings, zoomFactor: zoom, nonce: newNonce),
+                    bodyFragment: body,
+                    sourceURL: doc.fileURL
+                )
+            }
 
             if isUpdate {
                 let escaped = body.jsEscaped()
