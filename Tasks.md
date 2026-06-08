@@ -217,6 +217,50 @@ Keep this file ASCII-only.
 
 ---
 
+## H - Git History & Comparison
+
+Support recalling previous versions of a document when its file lives in a git
+repository, plus side-by-side comparison of two versions (rendered Markdown view,
+red for removals on the older side, green for additions on the newer side,
+with later polish for scroll alignment of unchanged sections).
+
+See the approved implementation plan (session plan.md) for architecture,
+phasing (A then B then C), and constraints from Design.md.
+
+- [CODED] H1.1 Add GitClient (Process + /usr/bin/env git, no shell) + GitError.
+  Operations needed for a document fileURL: is inside work tree, get toplevel +
+  relative path, list history (git log limited, --follow), cat a blob at rev.
+  Silent graceful degradation + friendly banner when git missing or file untracked.
+- [CODED] H1.2 GitVersion struct (full/short sha, subject, authorDate, ...).
+  GitFileHistory (array of versions + working-tree sentinel). Limited fetch +
+  "load more".
+- [CODED] H1.3 Historical "recall" view: from a live window, load a past revision's
+  text as a read-only snapshot (via renderer), show a persistent InfoBanner
+  ("Viewing <short> - <subject>") with "Return to current version" action.
+  Suspend FileWatcher while viewing history; title augmentation. Return restores
+  live disk content + re-arms watcher.
+- [NEW] H1.4 "Open this historical revision in a new window" (synthetic identity
+  so it does not collide with the live DocumentKey in the registry).
+- [CODED] H1.5 Manual smoke + error cases for H1 (no git, untracked, huge blob,
+  lossy decode of old content, etc.). Debug menu item ("Debug: View First Historical (git)")
+  provides immediate test coverage. Update smoke checklist (X.2) as needed.
+- [NEW] H2.1 (after H1) GitClient diff support + small unified-diff hunk parser.
+- [NEW] H2.2 Basic side-by-side comparison surface (new window or synthetic diff
+  HTML page loaded into the webview) showing two rendered versions side-by-side
+  (older left) using the normal MarkdownRenderer pipeline. Header with metadata
+  and +/- stats.
+- [NEW] H2.3 Red/green visual treatment on the rendered content (hunk/block level
+  tints, borders, or markers using new CSS vars in theme.css that respect light/dark;
+  leverage existing del/ins where helpful). "Compare with previous" and picker.
+- [NEW] H2.4 From compare surface: open either side as a normal (or historical)
+  document window; swap sides.
+- [NEW] H3.1 (after H2) Scroll sync + prev/next hunk navigation so unchanged
+  sections stay roughly side-by-side (hunk-row layout or sampled mapping in JS).
+- [NEW] H3.2 Collapse large unchanged context hunks; finer intra-hunk word
+  highlights (optional); loading states, accessibility, perf caps, empty states.
+
+---
+
 ## Cross-cutting / Definition of Done
 - [DONE] X.1 All unit test suites green (Renderer, DocumentKey, LinkClassifier,
   HeadingSlugger).

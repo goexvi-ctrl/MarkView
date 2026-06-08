@@ -20,6 +20,7 @@
 		5F002020000000000000BBBB /* MarkdownDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001020000000000000BBBB /* MarkdownDocument.swift */; };
 		5F002021000000000000BBBB /* DocumentKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001021000000000000BBBB /* DocumentKey.swift */; };
 		5F002022000000000000BBBB /* FileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001022000000000000BBBB /* FileWatcher.swift */; };
+		5F002024000000000000BBBB /* GitClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001024000000000000BBBB /* GitClient.swift */; };
 		5F002023000000000000BBBB /* RecentDocumentsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001023000000000000BBBB /* RecentDocumentsStore.swift */; };
 		5F002030000000000000BBBB /* MarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001030000000000000BBBB /* MarkdownRenderer.swift */; };
 		5F002031000000000000BBBB /* HeadingSlugger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001031000000000000BBBB /* HeadingSlugger.swift */; };
@@ -63,6 +64,7 @@
 		5F001021000000000000BBBB /* DocumentKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentKey.swift; sourceTree = "<group>"; };
 		5F001022000000000000BBBB /* FileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcher.swift; sourceTree = "<group>"; };
 		5F001023000000000000BBBB /* RecentDocumentsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentDocumentsStore.swift; sourceTree = "<group>"; };
+		5F001024000000000000BBBB /* GitClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitClient.swift; sourceTree = "<group>"; };
 		5F001030000000000000BBBB /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
 		5F001031000000000000BBBB /* HeadingSlugger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeadingSlugger.swift; sourceTree = "<group>"; };
 		5F001032000000000000BBBB /* HTMLTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLTemplate.swift; sourceTree = "<group>"; };
@@ -191,6 +193,7 @@
 				5F001021000000000000BBBB /* DocumentKey.swift */,
 				5F001022000000000000BBBB /* FileWatcher.swift */,
 				5F001023000000000000BBBB /* RecentDocumentsStore.swift */,
+				5F001024000000000000BBBB /* GitClient.swift */,
 			);
 			path = Model;
 			sourceTree = "<group>";
@@ -354,6 +357,7 @@
 				5F002021000000000000BBBB /* DocumentKey.swift in Sources */,
 				5F002022000000000000BBBB /* FileWatcher.swift in Sources */,
 				5F002023000000000000BBBB /* RecentDocumentsStore.swift in Sources */,
+				5F002024000000000000BBBB /* GitClient.swift in Sources */,
 				5F002030000000000000BBBB /* MarkdownRenderer.swift in Sources */,
 				5F002031000000000000BBBB /* HeadingSlugger.swift in Sources */,
 				5F002032000000000000BBBB /* HTMLTemplate.swift in Sources */,

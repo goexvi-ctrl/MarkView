@@ -124,4 +124,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller.reloadCurrentDocument()
         }
     }
+
+    // Temporary debug hook for H1 git recall (remove or hide behind #if DEBUG later).
+    @objc func debugViewFirstHistoricalVersion(_ sender: Any?) {
+        guard let controller = DocumentWindowRegistry.shared.focusedController() else { return }
+        // Fire-and-forget; the controller method does the async fetch + UI.
+        // We ask for history and pick the first real (non-WT) entry if present.
+        Task { @MainActor in
+            // The GitClient is internal to the controller for now; expose a tiny
+            // convenience or just call a method we can add. For the absolute
+            // minimum we can cheat by reaching through a future public API.
+            // Instead, for immediate testability we add a direct debug path on DWC.
+            // (See DocumentWindowController.debugViewFirstHistorical for the impl.)
+            controller.debugViewFirstHistoricalVersion()
+        }
+    }
+
+    @objc func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(debugViewFirstHistoricalVersion(_:)) {
+            guard let controller = DocumentWindowRegistry.shared.focusedController() else {
+                return false
+            }
+            return controller.isInGitRepository
+        }
+        return true
+    }
 }

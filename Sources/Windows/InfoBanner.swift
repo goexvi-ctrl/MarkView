@@ -13,6 +13,8 @@ private struct BannerBody: View {
     let message: String
     let style: BannerStyle
     let onDismiss: () -> Void
+    /// Optional secondary action button (e.g. "Return to current" for historical views).
+    let action: (title: String, handler: () -> Void)?
 
     private var bg: Color {
         switch style {
@@ -39,6 +41,20 @@ private struct BannerBody: View {
                 .font(.system(size: 12))
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let act = action {
+                Button(act.title) {
+                    act.handler()
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .font(.system(size: 11, weight: .semibold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Color.white.opacity(0.18))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+
             Button { onDismiss() } label: {
                 Image(systemName: "xmark")
                     .foregroundStyle(.white.opacity(0.8))
@@ -60,9 +76,12 @@ final class InfoBannerView: NSView {
     private let hosting: NSHostingView<BannerBody>
     private var dismissTask: DispatchWorkItem?
 
-    init(message: String, style: BannerStyle, onDismiss: @escaping () -> Void) {
+    init(message: String,
+         style: BannerStyle,
+         action: (title: String, handler: () -> Void)? = nil,
+         onDismiss: @escaping () -> Void) {
         hosting = NSHostingView(
-            rootView: BannerBody(message: message, style: style, onDismiss: onDismiss)
+            rootView: BannerBody(message: message, style: style, onDismiss: onDismiss, action: action)
         )
         super.init(frame: .zero)
         hosting.translatesAutoresizingMaskIntoConstraints = false
@@ -81,8 +100,11 @@ final class InfoBannerView: NSView {
 
 extension MarkdownWebViewController {
 
-    private static var bannerKey = "infoBanner"
-    private static var bannerTaskKey = "infoBannerTask"
+    // Use a static Void? for the key so we take its stable address as the
+    // UnsafeRawPointer. Using a String literal or &String triggers the
+    // "exposes the internal representation" warning under recent Swift.
+    private static var bannerKey: Void?
+    private static var bannerTaskKey: Void?
 
     private var currentBanner: InfoBannerView? {
         get { objc_getAssociatedObject(self, &Self.bannerKey) as? InfoBannerView }
@@ -95,10 +117,11 @@ extension MarkdownWebViewController {
 
     func showBanner(_ message: String,
                     style: BannerStyle = .warning,
-                    autoDismiss: Bool = true) {
+                    autoDismiss: Bool = true,
+                    action: (title: String, handler: () -> Void)? = nil) {
         dismissBanner()
 
-        let banner = InfoBannerView(message: message, style: style) { [weak self] in
+        let banner = InfoBannerView(message: message, style: style, action: action) { [weak self] in
             self?.dismissBanner()
         }
         banner.translatesAutoresizingMaskIntoConstraints = false

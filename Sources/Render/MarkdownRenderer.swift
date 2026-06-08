@@ -7,11 +7,17 @@ import AppKit
 enum MarkdownRenderer {
 
     static func render(document: MarkdownDocument, allowUnsafeHTML: Bool = false) -> String {
-        switch document.fileType {
+        render(text: document.text, fileType: document.fileType, allowUnsafeHTML: allowUnsafeHTML)
+    }
+
+    /// Render arbitrary source text using the same pipeline as a live document
+    /// of the given type. Used for git historical snapshots (no live file required).
+    static func render(text: String, fileType: MarkdownDocument.FileType, allowUnsafeHTML: Bool = false) -> String {
+        switch fileType {
         case .plainText:
-            return renderPlainText(document.text)
+            return renderPlainText(text)
         case .markdown:
-            return renderMarkdown(document.text, allowUnsafeHTML: allowUnsafeHTML)
+            return renderMarkdown(text, allowUnsafeHTML: allowUnsafeHTML)
         }
     }
 

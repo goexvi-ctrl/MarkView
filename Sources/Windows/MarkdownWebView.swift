@@ -23,6 +23,19 @@ final class MarkdownWebViewController: NSViewController {
     var lastScrollY: Double = 0
     private var appearanceCancellable: AnyCancellable?
 
+    // When non-nil we are viewing a git historical snapshot instead of the live
+    // on-disk document text. The live document (and its fileURL/base) is kept for
+    // title, relative asset resolution, and "return to current".
+    private var historicalOverride: (version: GitVersion, text: String)?
+
+    /// Called by the coordinator when the JS bridge sends a history navigation request
+    /// (from arrow keys or < > while reviewing versions).
+    var handleHistoryStep: ((Int, Bool) -> Void)?
+
+    /// Back-pointer to the owning DWC, set for windows that support git history navigation
+    /// (including the dedicated historical snapshot windows opened via Shift-< etc.).
+    weak var owningDocumentWindowController: DocumentWindowController?
+
     init(document: MarkdownDocument, zoomFactor: Double) {
         self.document = document
         self.currentZoom = zoomFactor
@@ -146,6 +159,40 @@ final class MarkdownWebViewController: NSViewController {
         renderAndLoad(restoreScrollY: restoreScrollY)
     }
 
+    // MARK: - Git historical snapshots (H1)
+
+    /// True while we are displaying a git historical revision instead of the live
+    /// on-disk content of `document`. The live document (and its fileURL) remains
+    /// for title, base directory (relative assets), and "return to current".
+    var isViewingHistoricalVersion: Bool {
+        historicalOverride != nil
+    }
+
+    /// Internal for history list reconciliation (DWC). Not for general use.
+    var currentHistoricalSnapshot: (version: GitVersion, text: String)? {
+        historicalOverride
+    }
+
+    /// Switch the view to render the provided historical text (from a git blob)
+    /// while keeping the live `document` for identity, title, and baseURL.
+    /// Shows the content as a full fresh load. The caller (usually DWC) is
+    /// responsible for showing a persistent banner with the "Return" action.
+    func enterHistoricalView(_ version: GitVersion, text: String) {
+        historicalOverride = (version, text)
+        // Historical content is a completely different snapshot; start fresh.
+        hasInitialContentLoaded = false
+        loadDocument()
+    }
+
+    /// Leave historical view and re-render from the live on-disk document text.
+    /// The caller re-arms any file watcher and updates UI state (banner, title).
+    func exitHistoricalView() {
+        guard historicalOverride != nil else { return }
+        historicalOverride = nil
+        hasInitialContentLoaded = false
+        loadDocument()
+    }
+
     // Render HTML (potentially off-thread for large files), then load into webView.
     private func renderAndLoad(restoreScrollY: Double?) {
         let doc      = document
@@ -156,10 +203,13 @@ final class MarkdownWebViewController: NSViewController {
 
         let isUpdate = hasInitialContentLoaded
 
+        // Effective source for this render (may be a git historical snapshot).
+        let sourceText = historicalOverride?.text ?? doc.text
+
         if doc.text.count > Self.asyncRenderThreshold {
             // Off-main render for large files (cmark-gfm work).
             Task.detached(priority: .userInitiated) {
-                let body = MarkdownRenderer.render(document: doc)
+                let body = MarkdownRenderer.render(text: sourceText, fileType: doc.fileType)
                 await MainActor.run { [weak self] in
                     guard let self, self.nonce == newNonce else { return }
                     if DebugFlags.dumpHTML {
@@ -196,7 +246,7 @@ final class MarkdownWebViewController: NSViewController {
                 }
             }
         } else {
-            let body = MarkdownRenderer.render(document: doc)
+            let body = MarkdownRenderer.render(text: sourceText, fileType: doc.fileType)
             if DebugFlags.dumpHTML {
                 self.debugDumpHTML(
                     fullHTML: isUpdate ? nil : HTMLTemplate.build(body: body, settings: settings, zoomFactor: zoom, nonce: newNonce),

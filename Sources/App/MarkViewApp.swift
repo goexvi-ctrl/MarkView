@@ -81,6 +81,12 @@ struct MarkViewApp: App {
                     NSApp.sendAction(#selector(AppDelegate.reloadDocument(_:)), to: nil, from: nil)
                 }
                 .keyboardShortcut("r", modifiers: .command)
+
+                // Temporary H1 debug hook. Opens the first prior git version of the
+                // current document (if any) using the new historical recall path.
+                Button("Debug: View First Historical (git)") {
+                    NSApp.sendAction(#selector(AppDelegate.debugViewFirstHistoricalVersion(_:)), to: nil, from: nil)
+                }
             }
         }
     }
