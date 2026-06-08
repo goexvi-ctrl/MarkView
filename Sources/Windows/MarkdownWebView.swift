@@ -193,6 +193,22 @@ final class MarkdownWebViewController: NSViewController {
         loadDocument()
     }
 
+    // MARK: - Comparison view (H2 basic)
+
+    /// Loads a fully synthetic side-by-side comparison HTML page.
+    /// Used for git version diff surfaces; the HTML is self-contained (headers + two
+    /// pre-rendered bodies) and does not go through the normal single-document template.
+    func loadComparisonHTML(_ html: String, baseURL: URL) {
+        hasInitialContentLoaded = false
+        webView.loadHTMLString(html, baseURL: baseURL)
+    }
+
+    /// Called when leaving a comparison view; the caller will typically trigger a
+    /// normal document (or historical) reload immediately after.
+    func exitComparisonView() {
+        // Nothing special to unwind yet (no override state); the caller reloads content.
+    }
+
     // Render HTML (potentially off-thread for large files), then load into webView.
     private func renderAndLoad(restoreScrollY: Double?) {
         let doc      = document

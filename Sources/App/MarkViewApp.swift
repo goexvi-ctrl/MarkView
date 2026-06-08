@@ -87,6 +87,12 @@ struct MarkViewApp: App {
                 Button("Debug: View First Historical (git)") {
                     NSApp.sendAction(#selector(AppDelegate.debugViewFirstHistoricalVersion(_:)), to: nil, from: nil)
                 }
+
+                // H2 debug: basic side-by-side comparison surface (live vs first commit).
+                // Uses GitClient.diffHunks + dual MarkdownRenderer + synthetic comparison HTML.
+                Button("Debug: Compare live vs first historical (git)") {
+                    NSApp.sendAction(#selector(AppDelegate.debugCompareLiveWithFirstHistorical(_:)), to: nil, from: nil)
+                }
             }
         }
     }

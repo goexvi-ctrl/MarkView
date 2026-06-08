@@ -251,11 +251,21 @@ phasing (A then B then C), and constraints from Design.md.
   fast-path from live, WT sentinel exit, revision selector, info panel reuse +
   auto-dismiss on revision change, Return-to-current for both normal and pure
   snapshots) exercised via Xcode console logs + debug menu. Updated X.2 checklist.
-- [NEW] H2.1 (after H1) GitClient diff support + small unified-diff hunk parser.
-- [NEW] H2.2 Basic side-by-side comparison surface (new window or synthetic diff
+- [CODED] H2.1 (after H1) GitClient diff support + small unified-diff hunk parser.
+  Added `diffHunks(base:target:for:)` (and GitVersion overload) + `GitDiffHunk`
+  struct. Parser extracts @@ ranges from `git diff --no-color -U3`. Supports WT
+  sentinel (empty sha) on either side. Build verified.
+- [CODED] H2.2 Basic side-by-side comparison surface (new window or synthetic diff
   HTML page loaded into the webview) showing two rendered versions side-by-side
   (older left) using the normal MarkdownRenderer pipeline. Header with metadata
   and +/- stats.
+  Implemented via debug trigger ("Debug: Compare live vs first historical (git)"):
+  fetches texts (content() or live), dual `MarkdownRenderer.render`, builds
+  comparison HTML via new `HTMLTemplate.buildComparison` (flex panes, labels,
+  stats from hunk count, theme + vendor scripts for rich content inside panes),
+  loads via dedicated `loadComparisonHTML`. Native InfoBanner with "Return to
+  document" action that exits and reloads. Title updated. Basic (no full picker
+  or hunk-driven tinting yet).
 - [NEW] H2.3 Red/green visual treatment on the rendered content (hunk/block level
   tints, borders, or markers using new CSS vars in theme.css that respect light/dark;
   leverage existing del/ins where helpful). "Compare with previous" and picker.

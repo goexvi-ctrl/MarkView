@@ -49,6 +49,15 @@ struct GitVersion: Equatable, Hashable {
     )
 }
 
+/// A contiguous changed region (hunk) from a unified diff.
+/// Ranges are 1-based as emitted by git (@@ -oldStart,oldCount +newStart,newCount @@).
+struct GitDiffHunk: Equatable, Hashable {
+    let oldStart: Int
+    let oldCount: Int
+    let newStart: Int
+    let newCount: Int
+}
+
 /// Small client for the git operations we need for document history.
 /// All git interaction goes through /usr/bin/env git (or equivalent) using Process.
 /// Safe argument arrays are used; never constructs a shell command string.
@@ -152,6 +161,43 @@ final class GitClient {
         return msg.isEmpty ? "(no commit message)" : msg
     }
 
+    // MARK: - Diff support (H2.1)
+
+    /// Returns parsed hunks for the unified diff from `base` (older/left) to `target`
+    /// (newer/right) for the given file.
+    ///
+    /// Either rev may be the empty string (working-tree sentinel); git will diff
+    /// against the on-disk content for that side. Callers should order so the
+    /// older revision is `base`.
+    /// Uses `git diff --no-color -U3 ...` and a small hand-rolled hunk header parser.
+    func diffHunks(base baseRev: String, target targetRev: String, for file: URL) async throws -> [GitDiffHunk] {
+        let (toplevel, rel) = try await repoContext(for: file)
+
+        var revSpecs: [String] = []
+        if !baseRev.isEmpty { revSpecs.append(baseRev) }
+        if !targetRev.isEmpty { revSpecs.append(targetRev) }
+
+        let args = ["git", "-C", toplevel.path, "diff", "--no-color", "-U3", "--no-ext-diff", "--no-textconv"] + revSpecs + ["--", rel]
+        let (stdout, stderr, code) = try await runProcess(arguments: args)
+        if code != 0 {
+            let trimmedErr = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedErr.isEmpty {
+                // Some "errors" (e.g. binary) still produce stdout headers; let parser decide.
+                // Only hard-fail on obvious problems.
+                if trimmedErr.lowercased().contains("not a git repository") {
+                    throw GitError.notARepository(file)
+                }
+                // Fall through; many cases still yield usable (or empty) diff.
+            }
+        }
+        return parseUnifiedDiffHunks(stdout)
+    }
+
+    /// Convenience for GitVersion (handles the working-tree sentinel via empty sha).
+    func diffHunks(from older: GitVersion, to newer: GitVersion, for file: URL) async throws -> [GitDiffHunk] {
+        return try await diffHunks(base: older.sha, target: newer.sha, for: file)
+    }
+
     // MARK: - Low-level process helpers (internal for now)
 
     private func runForToplevel(containing file: URL) async throws -> URL {
@@ -237,5 +283,47 @@ final class GitClient {
         let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
         let stderr = String(data: stderrData, encoding: .utf8) ?? ""
         return (stdout, stderr, process.terminationStatus)
+    }
+
+    // MARK: - Small unified diff parser (H2.1)
+
+    private func parseUnifiedDiffHunks(_ output: String) -> [GitDiffHunk] {
+        var hunks: [GitDiffHunk] = []
+        for line in output.components(separatedBy: .newlines) {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            if t.hasPrefix("@@ ") && t.contains(" @@") {
+                if let h = parseHunkHeader(t) {
+                    hunks.append(h)
+                }
+            }
+        }
+        return hunks
+    }
+
+    private func parseHunkHeader(_ header: String) -> GitDiffHunk? {
+        // Matches: @@ -10,4 +12,5 @@ context
+        // or      @@ -10 +12 @@
+        // or      @@ -10,0 +12,3 @@
+        let pattern = #"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ "#
+
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: header, range: NSRange(location: 0, length: header.utf16.count)) else {
+            return nil
+        }
+
+        func capture(_ idx: Int) -> Int {
+            let nsRange = match.range(at: idx)
+            if nsRange.location == NSNotFound { return 1 }
+            let start = header.index(header.startIndex, offsetBy: nsRange.location)
+            let end = header.index(start, offsetBy: nsRange.length)
+            let s = String(header[start..<end])
+            return Int(s) ?? 1
+        }
+
+        let oldStart = capture(1)
+        let oldCount = capture(2)
+        let newStart = capture(3)
+        let newCount = capture(4)
+        return GitDiffHunk(oldStart: oldStart, oldCount: oldCount, newStart: newStart, newCount: newCount)
     }
 }

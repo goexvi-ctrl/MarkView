@@ -140,8 +140,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // Debug hook for H2 basic comparison surface (live vs first historical commit).
+    @objc func debugCompareLiveWithFirstHistorical(_ sender: Any?) {
+        guard let controller = DocumentWindowRegistry.shared.focusedController() else { return }
+        Task { @MainActor in
+            controller.debugCompareLiveWithFirstHistorical()
+        }
+    }
+
     @objc func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(debugViewFirstHistoricalVersion(_:)) {
+            guard let controller = DocumentWindowRegistry.shared.focusedController() else {
+                return false
+            }
+            return controller.isInGitRepository
+        }
+        if menuItem.action == #selector(debugCompareLiveWithFirstHistorical(_:)) {
             guard let controller = DocumentWindowRegistry.shared.focusedController() else {
                 return false
             }

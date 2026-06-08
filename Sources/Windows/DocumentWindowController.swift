@@ -38,6 +38,9 @@ final class DocumentWindowController: NSWindowController {
     private var currentHistoricalFullMessage: String?
     private var currentHistoricalVersion: GitVersion?
 
+    /// Active comparison (H2). When set we have loaded a synthetic side-by-side page.
+    private var comparisonVersions: (left: GitVersion, right: GitVersion)?
+
     /// The (optional) info popup panel for this window. We keep at most one per DWC
     /// so that repeated presses of the titlebar ⓘ reuse it instead of spawning multiples.
     private var currentInfoPanel: NSPanel?
@@ -343,6 +346,90 @@ final class DocumentWindowController: NSWindowController {
                 )
             }
         }
+    }
+
+    // Debug-only (H2). Opens a basic side-by-side comparison between the live
+    // document and the first historical commit (newer on the right). Exercises
+    // GitClient.diffHunks + MarkdownRenderer for both sides + synthetic HTML load.
+    func debugCompareLiveWithFirstHistorical() {
+        guard isInGitRepository else {
+            webViewController?.showBanner("Not in a git repository.", style: .warning, autoDismiss: true)
+            return
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let hist = try await self.gitClient.history(for: self.markdownDocument.fileURL, limit: 5)
+                guard let firstReal = hist.first(where: { !$0.isWorkingTree }) else {
+                    self.webViewController?.showBanner(
+                        "No previous git versions to compare.",
+                        style: .warning, autoDismiss: true
+                    )
+                    return
+                }
+                await self.performComparison(left: firstReal, right: .workingTree)
+            } catch {
+                self.webViewController?.showBanner(
+                    "Compare failed: \(error.localizedDescription)",
+                    style: .error, autoDismiss: true
+                )
+            }
+        }
+    }
+
+    private func performComparison(left: GitVersion, right: GitVersion) async {
+        do {
+            let leftText: String = left.isWorkingTree
+                ? self.markdownDocument.text
+                : try await self.gitClient.content(at: left.sha, for: self.markdownDocument.fileURL)
+            let rightText: String = right.isWorkingTree
+                ? self.markdownDocument.text
+                : try await self.gitClient.content(at: right.sha, for: self.markdownDocument.fileURL)
+
+            let leftBody = MarkdownRenderer.render(text: leftText, fileType: self.markdownDocument.fileType)
+            let rightBody = MarkdownRenderer.render(text: rightText, fileType: self.markdownDocument.fileType)
+
+            let hunks = try await self.gitClient.diffHunks(from: left, to: right, for: self.markdownDocument.fileURL)
+            let stats = hunks.isEmpty ? "identical" : "\(hunks.count) region(s) changed"
+
+            let html = HTMLTemplate.buildComparison(
+                leftBody: leftBody,
+                rightBody: rightBody,
+                leftLabel: "\(left.shortSha) — \(left.subject)",
+                rightLabel: right.isWorkingTree ? "Working tree (current on disk)" : "\(right.shortSha) — \(right.subject)",
+                stats: stats,
+                settings: SettingsStore.shared,
+                zoomFactor: self.zoomFactor
+            )
+
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.comparisonVersions = (left, right)
+                self.window?.title = "\(self.markdownDocument.displayTitle) — compare \(left.shortSha) vs \(right.shortSha)"
+                self.webViewController?.loadComparisonHTML(html, baseURL: self.markdownDocument.fileURL.deletingLastPathComponent())
+                self.webViewController?.showBanner(
+                    "Comparison view (read-only)",
+                    style: .info,
+                    autoDismiss: false,
+                    action: ("Return to document", { [weak self] in self?.exitComparisonView() })
+                )
+            }
+        } catch {
+            await MainActor.run { [weak self] in
+                self?.webViewController?.showBanner(
+                    "Compare failed: \(error.localizedDescription)",
+                    style: .error, autoDismiss: true
+                )
+            }
+        }
+    }
+
+    private func exitComparisonView() {
+        comparisonVersions = nil
+        window?.title = markdownDocument.displayTitle
+        webViewController?.exitComparisonView()
+        // For the debug "live vs first" case we return to live document.
+        webViewController?.loadDocument()
     }
 
     // MARK: - History list management and keyboard-driven stepping (< > arrows)
