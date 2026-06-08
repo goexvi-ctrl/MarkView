@@ -12,9 +12,9 @@ body {
   background: var(--color-canvas-default);
   margin: 0;
   padding: 1em 2em;
-  max-width: 900px;
-  margin-left: auto;
-  margin-right: auto;
+  /* Removed hard max-width + auto centering so content can use the full window width
+     when the window is widened (user request). Previously this created a "page" cap
+     around 900px with wasted space on the sides. */
   box-sizing: border-box;
 }
 

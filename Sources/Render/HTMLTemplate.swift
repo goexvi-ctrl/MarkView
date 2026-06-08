@@ -100,7 +100,15 @@ enum HTMLTemplate {
         <link rel="stylesheet" href="asset://vendor/katex.min.css">
         <link rel="stylesheet" href="asset://vendor/highlight-github.min.css">
         <style>
-          html, body { height: 100%; margin: 0; overflow: hidden; }
+          /* Base comparison layout (full viewport, flex columns) */
+          html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            box-sizing: border-box;
+          }
           body {
             font-family: var(--body-font);
             font-size: calc(var(--base-font-size) * var(--zoom));
@@ -120,14 +128,18 @@ enum HTMLTemplate {
             align-items: center;
             gap: 8px;
             white-space: nowrap;
+            box-sizing: border-box;
           }
           .compare-panes {
             display: flex;
-            flex: 1;
+            flex: 1 1 0;
             min-height: 0;
+            width: 100%;
+            box-sizing: border-box;
           }
           .compare-pane {
             flex: 1 1 0;
+            min-width: 0; /* crucial: allows pane to shrink below intrinsic content width on resize */
             overflow: auto;
             padding: 12px 16px;
             box-sizing: border-box;
@@ -145,6 +157,17 @@ enum HTMLTemplate {
           /* Basic block-level hinting for H2.2 (refined in H2.3) */
           .compare-pane .older-hint { background: #ffebe9; }
           .compare-pane .newer-hint { background: #dafbe1; }
+        </style>
+        <!-- Strong override after theme.css so comparison always uses full window width
+             (no "page" max-width cap, and no auto side margins). This also ensures
+             the flex panes can grow to 50% each when the window is widened. -->
+        <style>
+          body {
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          .compare-panes { width: 100% !important; }
         </style>
         </head>
         <body>
