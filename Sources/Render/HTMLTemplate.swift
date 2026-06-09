@@ -137,14 +137,64 @@ enum HTMLTemplate {
             width: 100%;
             box-sizing: border-box;
           }
+          .pane-wrapper {
+            position: relative;
+            flex: 1 1 0;
+            min-height: 0;
+            min-width: 0;
+            display: flex;
+          }
           .compare-pane {
             flex: 1 1 0;
-            min-width: 0; /* crucial: allows pane to shrink below intrinsic content width on resize */
+            min-width: 0;
+            overflow: auto;
+            padding: 12px 16px;
+            box-sizing: border-box;
+            scrollbar-width: none; /* Firefox */
+          }
+          .compare-pane::-webkit-scrollbar {
+            display: none; /* Chrome/Safari/Edge */
+          }
+          .scrollbar-track {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 12px;
+            background-color: #f1f1f1;
+            z-index: 10;
+            cursor: pointer;
+          }
+          .scrollbar-thumb {
+            position: absolute;
+            left: 1px;
+            right: 1px;
+            background-color: #c1c1c1;
+            border-radius: 6px;
+            min-height: 20px;
+            cursor: grab;
+          }
+          .diff-marker {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 4px;
+            border-radius: 2px;
+            pointer-events: none;
+            z-index: 11;
+          }
+          .left-track .diff-marker { background-color: #d73a49; }
+          .right-track .diff-marker { background-color: #28a745; }
+          .compare-pane {
+            flex: 1 1 0;
+            min-width: 0;
             overflow: auto;
             padding: 12px 16px;
             box-sizing: border-box;
           }
-          .compare-pane + .compare-pane { border-left: 1px solid #d0d7de; }
+          .pane-with-gutter + .pane-with-gutter .compare-pane {
+            border-left: 1px solid #d0d7de;
+          }
           .pane-label {
             font-family: var(--code-font);
             font-size: 11px;
@@ -167,7 +217,8 @@ enum HTMLTemplate {
             margin: 0 !important;
             padding: 0 !important;
           }
-          .compare-panes { width: 100% !important; }
+          .compare-panes { width: 100% !important; display: flex !important; }
+          .pane-with-gutter { flex: 1 1 0 !important; min-width: 0 !important; }
         </style>
         </head>
         <body>
@@ -179,20 +230,155 @@ enum HTMLTemplate {
           <span>Newer: <strong>\(rightEsc)</strong></span>
         </div>
         <div class="compare-panes">
-          <div class="compare-pane">
-            <div class="pane-label">\(leftEsc)</div>
-            \(leftBody)
+          <div class="pane-wrapper">
+            <div class="compare-pane" id="left-pane">
+              <div class="pane-label">\(leftEsc)</div>
+              \(leftBody)
+            </div>
+            <div class="scrollbar-track left-track" id="left-track">
+              <div class="scrollbar-thumb" id="left-thumb"></div>
+              <!-- diff markers added by JS -->
+            </div>
           </div>
-          <div class="compare-pane">
-            <div class="pane-label">\(rightEsc)</div>
-            \(rightBody)
+          <div class="pane-wrapper">
+            <div class="compare-pane" id="right-pane">
+              <div class="pane-label">\(rightEsc)</div>
+              \(rightBody)
+            </div>
+            <div class="scrollbar-track right-track" id="right-track">
+              <div class="scrollbar-thumb" id="right-thumb"></div>
+              <!-- diff markers added by JS -->
+            </div>
           </div>
         </div>
         <script src="asset://vendor/highlight.min.js"></script>
         <script src="asset://vendor/katex.min.js"></script>
         <script src="asset://vendor/katex-auto-render.min.js"></script>
         <script src="asset://vendor/mermaid.min.js"></script>
-        <script>const BRIDGE_NONCE = 'compare-only';</script>
+        <script>
+        const BRIDGE_NONCE = 'compare-only';
+
+        (function() {
+          function initCustomScrollbar(paneId, trackId, thumbId, isLeft) {
+            const pane = document.getElementById(paneId);
+            const track = document.getElementById(trackId);
+            const thumb = document.getElementById(thumbId);
+            if (!pane || !track || !thumb) return;
+
+            function updateThumb() {
+              const scrollHeight = pane.scrollHeight;
+              const clientHeight = pane.clientHeight;
+              if (scrollHeight <= clientHeight) {
+                thumb.style.display = 'none';
+                return;
+              }
+              thumb.style.display = 'block';
+              const ratio = clientHeight / scrollHeight;
+              const thumbHeight = Math.max(20, ratio * track.clientHeight);
+              thumb.style.height = thumbHeight + 'px';
+
+              const scrollRatio = pane.scrollTop / (scrollHeight - clientHeight);
+              const maxThumbTop = track.clientHeight - thumbHeight;
+              thumb.style.top = (scrollRatio * maxThumbTop) + 'px';
+            }
+
+            // Sync thumb when content scrolls
+            pane.addEventListener('scroll', updateThumb);
+            window.addEventListener('resize', updateThumb);
+
+            // Click on track (not thumb) to jump
+            track.addEventListener('click', function(ev) {
+              if (ev.target === thumb) return;
+              const rect = track.getBoundingClientRect();
+              const clickFrac = (ev.clientY - rect.top) / rect.height;
+              const targetScroll = clickFrac * (pane.scrollHeight - pane.clientHeight);
+              pane.scrollTo({ top: targetScroll, behavior: 'smooth' });
+            });
+
+            // Drag the thumb
+            let isDragging = false;
+            let dragStartY = 0;
+            let dragStartScroll = 0;
+
+            thumb.addEventListener('mousedown', function(ev) {
+              isDragging = true;
+              dragStartY = ev.clientY;
+              dragStartScroll = pane.scrollTop;
+              document.body.style.userSelect = 'none';
+              ev.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(ev) {
+              if (!isDragging) return;
+              const deltaY = ev.clientY - dragStartY;
+              const trackHeight = track.clientHeight;
+              const thumbHeight = thumb.clientHeight;
+              const scrollableHeight = pane.scrollHeight - pane.clientHeight;
+              const dragRatio = deltaY / (trackHeight - thumbHeight);
+              pane.scrollTop = dragStartScroll + dragRatio * scrollableHeight;
+            });
+
+            document.addEventListener('mouseup', function() {
+              if (isDragging) {
+                isDragging = false;
+                document.body.style.userSelect = '';
+                updateThumb();
+              }
+            });
+
+            // Initial position
+            setTimeout(updateThumb, 0);
+          }
+
+          function placeDiffMarkers(paneId, trackId, isLeft) {
+            const pane = document.getElementById(paneId);
+            const track = document.getElementById(trackId);
+            if (!pane || !track) return;
+
+            // Remove old markers (keep the thumb)
+            track.querySelectorAll('.diff-marker').forEach(m => m.remove());
+
+            const selector = isLeft ? '.diff-removed' : '.diff-added';
+            const changedElements = pane.querySelectorAll(selector);
+            const scrollHeight = pane.scrollHeight;
+            if (scrollHeight <= 0) return;
+
+            changedElements.forEach(el => {
+              // Use the top of the changed element relative to the scrollable content
+              const frac = el.offsetTop / scrollHeight;
+              const marker = document.createElement('div');
+              marker.className = 'diff-marker ' + (isLeft ? 'removed' : 'added');
+              marker.style.top = (frac * 100) + '%';
+              track.appendChild(marker);
+            });
+          }
+
+          function initAll() {
+            initCustomScrollbar('left-pane', 'left-track', 'left-thumb', true);
+            initCustomScrollbar('right-pane', 'right-track', 'right-thumb', false);
+
+            // Place markers after everything (including mermaid/katex/highlight) has rendered
+            setTimeout(function() {
+              placeDiffMarkers('left-pane', 'left-track', true);
+              placeDiffMarkers('right-pane', 'right-track', false);
+            }, 150);
+
+            // Re-place on resize in case layout changes heights
+            window.addEventListener('resize', function() {
+              setTimeout(function() {
+                placeDiffMarkers('left-pane', 'left-track', true);
+                placeDiffMarkers('right-pane', 'right-track', false);
+              }, 50);
+            });
+          }
+
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initAll);
+          } else {
+            initAll();
+          }
+        })();
+        </script>
         </body>
         </html>
         """

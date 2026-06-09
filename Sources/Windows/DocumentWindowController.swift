@@ -601,15 +601,16 @@ final class DocumentWindowController: NSWindowController {
             // outside the wrapper) then render the whole modified document once per side.
             // This keeps full Markdown structure (nested lists, TOCs, headings, etc.) while still
             // highlighting differing source lines in red/green.
+            let leftLines = leftText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            let rightLines = rightText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            let (lAnn, rAnn) = annotatedLines(leftLines: leftLines, rightLines: rightLines)
+
             let (leftDiffed, rightDiffed) = diffedMarkdownSources(leftText: leftText, rightText: rightText)
 
             let leftBody = MarkdownRenderer.render(text: leftDiffed, fileType: self.markdownDocument.fileType, allowUnsafeHTML: true)
             let rightBody = MarkdownRenderer.render(text: rightDiffed, fileType: self.markdownDocument.fileType, allowUnsafeHTML: true)
 
             // Stats from our line diff (no git diff).
-            let leftLines = leftText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-            let rightLines = rightText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-            let (lAnn, rAnn) = annotatedLines(leftLines: leftLines, rightLines: rightLines)
             let removedCount = lAnn.filter { $0.1 }.count
             let addedCount = rAnn.filter { $0.1 }.count
             let stats = (removedCount == 0 && addedCount == 0) ? "identical" : "\(removedCount) removed, \(addedCount) added (source lines)"
