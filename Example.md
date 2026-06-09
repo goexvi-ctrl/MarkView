@@ -26,9 +26,9 @@ This document demonstrates the various Markdown features supported by MarkView, 
 
 ### Subsection with *Italic*
 
-This paragraph describes the change to the headings feature: the top-level heading text was updated with new wording, and the level was changed from H1 to H2 to demonstrate partial structural and text changes in headings while keeping surrounding content intact.
+Changed version: the top-level heading was changed from level 1 to level 2 and the text was updated from "Main Document Title" to "Revised Document Title" to expose heading diff behavior.
 
-## This is a **revised** Main Document Title (changed from original H1)
+## Revised Document Title
 
 ## Section with **Bold**
 
@@ -48,11 +48,11 @@ Here is another paragraph. It demonstrates how text can include links, code, and
 
 This second paragraph follows after a blank line, ensuring proper separation from the previous one.
 
-This paragraph describes the change to the paragraphs feature: wording in the first paragraph was partially updated with new descriptive text, and an additional sentence was added to the second paragraph to show inline text modifications.
+Changed version: the first paragraph had "demonstrates how text can include" changed to "shows how text may contain", and the second paragraph had an extra sentence appended.
 
-Here is another paragraph. It demonstrates how text can include links, code, and other inline elements seamlessly within the flow of the paragraph itself. Additional sentence added here for the test case.
+Here is another paragraph. It shows how text may contain links, code, and other inline elements seamlessly within the flow of the paragraph itself.
 
-This second paragraph follows after a blank line, ensuring proper separation from the previous one. An extra sentence was appended to demonstrate partial paragraph changes.
+This second paragraph follows after a blank line, ensuring proper separation from the previous one. An extra sentence was appended here for the diff test.
 
 ## Emphasis and Strong Text
 
@@ -70,11 +70,11 @@ This sentence has *italic containing **bold** text* inside it.
 
 You can also have **bold with *italic* inside** for mixed styles.
 
-This paragraph describes the change to the emphasis feature: the italic text was reworded slightly, and the bold portion had its inner text updated to show word-level partial changes within emphasis syntax.
+Changed version: inside the italic the word "bold" was changed to "strong", and inside the bold the word "italic" was changed to "emphasized".
 
-This sentence has *italic containing **revised bold** text* inside it with updated wording.
+This sentence has *italic containing **strong** text* inside it.
 
-You can also have **bold with *modified italic* inside** for mixed styles demonstrating the diff.
+You can also have **bold with *emphasized* inside** for mixed styles.
 
 ## Strikethrough
 
@@ -86,9 +86,9 @@ This text has been ~~struck through~~ to show deletion or correction.
 
 The old method was ~~inefficient and slow~~, while the new approach is much better.
 
-This paragraph describes the change to the strikethrough feature: the struck-through phrase was updated to new wording, and an additional struck-through segment was inserted to demonstrate partial changes within strikethrough syntax.
+Changed version: the struck-through phrase was altered from "inefficient and slow" to "slow and inefficient" (word order and synonym change) and an extra struck word was added after it.
 
-The old method was ~~inefficient and slow~~, while the new approach is much better and **revised**. Additional ~~struck text added here~~ for testing word diffs.
+The old method was ~~slow and inefficient~~, while the new approach is much better. Additional ~~struck~~ text.
 
 ## Inline Code
 
@@ -100,9 +100,9 @@ Use backticks for `inline code` snippets, such as variable names like `userName`
 
 Functions like `calculateTotal(price, tax)` or constants such as `MAX_VALUE = 100` are common in code discussions.
 
-This paragraph describes the change to the inline code feature: the function name in the code was updated, and a parameter was changed along with surrounding sentence wording to show word-level diffs inside inline code spans.
+Changed version: the function name was changed from calculateTotal to calculateSum and the parameter tax was changed to taxRate, plus minor wording tweak in the sentence.
 
-Functions like `calculateSum(price, taxRate)` or constants such as `MAX_VALUE = 100` are common in code discussions with revised text.
+Functions like `calculateSum(price, taxRate)` or constants such as `MAX_VALUE = 100` are common in code discussions.
 
 ## Fenced Code Blocks
 
@@ -129,17 +129,17 @@ let message = greet(name: "World")
 print(message)
 ```
 
-This paragraph describes the change to the fenced code block feature: the function name and a string literal inside the code were changed, and a comment was updated with new wording, plus an extra print statement added to demonstrate partial code changes.
+Changed version: the function was renamed from greet to greetUser, the string "Hello" was changed to "Hi", the comment was slightly altered, and an extra print line was added.
 
 ```swift
-// A simple function to greet users - revised comment
+// A simple function to greet users - updated
 func greetUser(name: String) -> String {
-    return "Hello, \(name)!"
+    return "Hi, \(name)!"
 }
 
 let message = greetUser(name: "World")
 print(message)
-print("Additional line for diff test")
+print("Extra line added for test")
 ```
 
 ## Unordered Lists
@@ -160,13 +160,11 @@ print("Additional line for diff test")
 + Item using plus sign
 + Another plus item
 
-This paragraph describes the change to the unordered lists feature: one list item's text was reworded, a new item was inserted, and a nested item was deleted (via diff) to show added, removed, and modified list items with word changes.
+Changed version: the second asterisk item had its text changed from "Another asterisk item" to "Another asterisk item with update", a new list item was added, and the nested item under the plus was removed in the source.
 
-* Item using asterisk - revised wording
+* Item using asterisk
 * Another asterisk item with update
-  * Nested with asterisk
 + Item using plus sign
-+ New added item for testing
 + Another plus item
 
 ## Ordered Lists
@@ -186,12 +184,11 @@ This paragraph describes the change to the unordered lists feature: one list ite
    1. Nested ordered item
 7. Back to main list
 
-This paragraph describes the change to the ordered lists feature: the starting number and one item's text were changed, a new numbered item was added, and a nested sub-item was removed to test partial list modifications.
+Changed version: the starting number was left but item 6 text was changed, item 7 text tweaked, the nested sub-item removed, and a new item 8 added.
 
-5. Starting from five - revised start
-6. Continues sequentially with update
-   1. Nested ordered item
-7. Back to main list
+5. Starting from five
+6. Continues sequentially with modification
+7. Back to main list with tweak
 8. Newly added item for diff test
 
 ## Task Lists
@@ -210,13 +207,12 @@ This paragraph describes the change to the ordered lists feature: the starting n
   - [ ] Subtask two pending
 - [ ] Another main task
 
-This paragraph describes the change to the task lists feature: one task's text and checked state were updated, a new task item was added, and a subtask was removed to demonstrate changes to task list syntax and states.
+Changed version: the first task's text was changed and its state flipped, the subtask "Subtask two pending" was removed, and a new unchecked task was appended.
 
-- [x] Main task completed - revised text
+- [ ] Main task completed - text and state changed
   - [x] Subtask one done
-  - [ ] Subtask two pending
-- [ ] Another main task with update
-- [ ] Newly added pending task
+- [ ] Another main task
+- [ ] Newly added unchecked task
 
 ## Blockquotes
 
@@ -232,12 +228,12 @@ This paragraph describes the change to the task lists feature: one task's text a
 > > This is a nested inner quote.
 > > It demonstrates deeper quoting levels.
 
-This paragraph describes the change to the blockquotes feature: the text in the outer and inner quotes was partially reworded, and an additional sentence was added inside the nested quote to show inline text changes within blockquotes.
+Changed version: the outer quote text was changed from "This is the outer quote." to "This is the outer quote with revisions.", and inside the nested quote "deeper quoting levels" was changed to "deeper quote levels" with an extra sentence appended.
 
-> This is the outer quote with updated wording.
+> This is the outer quote with revisions.
 >
-> > This is a nested inner quote with revisions.
-> > It demonstrates deeper quoting levels. Additional changed sentence here.
+> > This is a nested inner quote.
+> > It demonstrates deeper quote levels. Extra sentence added here for testing.
 
 ## Links
 
@@ -255,15 +251,15 @@ Visit https://github.com for the project.
 
 Contact us at <support@example.com> for help.
 
-This paragraph describes the change to the links feature: the URL in the inline link was changed to a different domain, the link text was updated, and the reference link target and title were modified with partial word changes. An additional autolink was inserted.
+Changed version: the main URL was changed from github.com to example.com, the autolink email domain was changed, and a reference-style link with altered title was added.
 
-Visit https://example.com for the updated project site.
+Visit https://example.com for the project.
 
-See the [reference link][ref1] for more info with revised title.
+Contact us at <support@altered.example.com> for help.
 
-[ref1]: https://example.org "Updated Reference Title"
+See the [reference link][ref1] for more info.
 
-Contact us at <support@example.com> for help. New autolink added: https://new.example.com
+[ref1]: https://example.org "Altered Title"
 
 ## Images
 
@@ -275,9 +271,9 @@ Contact us at <support@example.com> for help. New autolink added: https://new.ex
 
 ![Placeholder Image 2](https://via.placeholder.com/200x100/ff6600/ffffff?text=Image+Two "Image Two Title")
 
-This paragraph describes the change to the images feature: the image URL was updated to a different placeholder size and text, and the title/alt attributes were changed with new wording to demonstrate partial changes to image syntax.
+Changed version: the image dimensions in the URL were changed from 200x100 to 250x75, the text inside the URL was changed from "Image+Two" to "Image+Two+Altered", and the title was changed from "Image Two Title" to "Altered Image Title".
 
-![Revised Image](https://via.placeholder.com/150x50/ff0000/ffffff?text=Changed+Image "Updated Image Title")
+![Placeholder Image 2](https://via.placeholder.com/250x75/ff6600/ffffff?text=Image+Two+Altered "Altered Image Title")
 
 ## Horizontal Rules
 
@@ -297,13 +293,13 @@ Content above.
 
 More content below.
 
-This paragraph describes the change to the horizontal rules feature: the rule style was changed from *** to ---, and descriptive text around it was updated with new wording to show changes involving HR syntax and adjacent paragraphs.
+Changed version: the rule was changed from *** to --- and the text above/below was slightly reworded.
 
-Content above with revised text.
+Content above - wording changed.
 
 ---
 
-More content below with added sentence for the test.
+More content below - wording changed for diff test.
 
 ## Tables
 
@@ -322,13 +318,12 @@ More content below with added sentence for the test.
 | Text one   |    Text two   |    Text three |
 | More left  |   More center |    More right |
 
-This paragraph describes the change to the tables feature: the text in one cell was updated with new wording, a new row was added, and one existing row was removed to demonstrate added, deleted, and modified table content at the cell and row level.
+Changed version: the cell "Text two" was changed to "Text two - modified", the row "More left..." was removed, and a new row was appended.
 
 | Left Align | Center Align | Right Align |
 |:-----------|:------------:|------------:|
-| Text one   |    Text two   |    Text three - revised wording here |
-| More left  |   More center |    More right |
-| New row added | Center new | Right new |
+| Text one   |    Text two - modified   |    Text three |
+| New row appended | Center | Right |
 
 ## Math Equations
 
@@ -357,7 +352,7 @@ c & d
 
 $$
 
-This paragraph describes the change to the math equations feature: the variable in the summation was renamed from i to k, the upper limit was changed, and part of the matrix was updated with different letters to show word/symbol changes in formulas.
+Changed version: in the summation the index variable was changed from i to k and the upper limit from n to m; in the matrix b was changed to x.
 
 Here is a summation:
 
@@ -367,7 +362,7 @@ $$
 
 $$
 
-And a matrix example with updates:
+And a matrix example:
 
 $$
 
@@ -394,11 +389,11 @@ Another reference here[^footnote2] and also here[^footnote3].
 
 [^footnote3]: Third footnote for additional information.
 
-This paragraph describes the change to the footnotes feature: the text of one footnote was updated with new wording, and an additional footnote reference and definition were inserted to demonstrate partial changes to footnote syntax and content.
+Changed version: the content of footnote2 was changed from "some explanation" to "some explanation and more", footnote3 text was altered, and a new footnote4 was added.
 
-Another reference here[^footnote2] and also here[^footnote3] with new reference[^footnote4] added.
+Another reference here[^footnote2] and also here[^footnote3].
 
-[^footnote2]: Second footnote with some explanation and revised text here.
-[^footnote3]: Third footnote for additional information.
-[^footnote4]: Newly added fourth footnote for the diff test case.
+[^footnote2]: Second footnote with some explanation and more.
+[^footnote3]: Third footnote for altered information.
+[^footnote4]: Added footnote four.
 
