@@ -481,41 +481,7 @@ final class DocumentWindowController: NSWindowController {
         return res
     }
 
-    private func highlightSourceLine(_ line: String, isRemoved: Bool, isAdded: Bool) -> String {
-        guard isRemoved || isAdded else { return line }
 
-        let wrapperOpen = isRemoved ? "<del class=\"diff-removed\">" : "<ins class=\"diff-added\">"
-        let wrapperClose = isRemoved ? "</del>" : "</ins>"
-
-        // Preserve leading whitespace exactly.
-        let leading = line.prefix(while: { $0.isWhitespace })
-        let rest = String(line.dropFirst(leading.count))
-
-        // Common block-starting markers that must remain at the start of the (trimmed) line
-        // for cmark to recognize headings, lists, blockquotes, etc.
-        let markers = [
-            "# ", "## ", "### ", "#### ", "##### ", "###### ",
-            "- ", "* ", "+ ",
-            "1. ", "2. ", "3. ", "4. ", "5. ", "6. ", "7. ", "8. ", "9. ", "0. ",
-            "> ", ">> ", ">>> "
-        ]
-
-        for marker in markers {
-            if rest.hasPrefix(marker) {
-                let after = String(rest.dropFirst(marker.count))
-                return String(leading) + marker + wrapperOpen + after + wrapperClose
-            }
-        }
-
-        // Fenced code, indented code, or plain text / continuation lines: wrap the whole rest.
-        // For a fenced opener we wrap the whole line so the ``` stays visible as removed/added.
-        if rest.hasPrefix("```") || rest.hasPrefix("~~~") || rest.hasPrefix("    ") || rest.hasPrefix("\t") {
-            return String(leading) + wrapperOpen + rest + wrapperClose
-        }
-
-        // Default (paragraph text, etc.): wrap the content.
-        return String(leading) + wrapperOpen + rest + wrapperClose
-    }
 
     private func annotatedLines(leftLines: [String], rightLines: [String]) -> (left: [(line: String, removed: Bool)], right: [(line: String, added: Bool)]) {
         let lcs = longestCommonSubsequence(leftLines, rightLines)
@@ -572,18 +538,66 @@ final class DocumentWindowController: NSWindowController {
         return (leftAnn, rightAnn)
     }
 
-    private func diffedMarkdownSources(leftText: String, rightText: String) -> (left: String, right: String) {
-        let leftLines = leftText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        let rightLines = rightText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        let (leftAnn, rightAnn) = annotatedLines(leftLines: leftLines, rightLines: rightLines)
 
-        let leftMod = leftAnn.map { (line, removed) in
-            highlightSourceLine(line, isRemoved: removed, isAdded: false)
-        }.joined(separator: "\n")
 
-        let rightMod = rightAnn.map { (line, added) in
-            highlightSourceLine(line, isRemoved: false, isAdded: added)
-        }.joined(separator: "\n")
+    // Word-by-word diff (H2.3 next step)
+    private func extractWords(_ text: String) -> [String] {
+        let regex = try! NSRegularExpression(pattern: "\\S+")
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.matches(in: text, range: range).map { match in
+            let r = Range(match.range, in: text)!
+            return String(text[r])
+        }
+    }
+
+    private func applyWordWrappers(to original: String, sideWords: [String], lcs: [String], open: String, close: String) -> String {
+        // Mark which words on this side are not part of the LCS (i.e. removed or added)
+        var isChanged = Array(repeating: false, count: sideWords.count)
+        var wi = 0
+        var ci = 0
+        while wi < sideWords.count {
+            if ci < lcs.count && sideWords[wi] == lcs[ci] {
+                wi += 1
+                ci += 1
+            } else {
+                isChanged[wi] = true
+                wi += 1
+            }
+        }
+
+        // Find word matches in original order and wrap the changed ones
+        let regex = try! NSRegularExpression(pattern: "\\S+")
+        let range = NSRange(original.startIndex..., in: original)
+        let matches = regex.matches(in: original, range: range)
+
+        var result = ""
+        var lastEnd = original.startIndex
+        var wordIdx = 0
+
+        for match in matches {
+            let mRange = Range(match.range, in: original)!
+            result += original[lastEnd..<mRange.lowerBound]
+
+            let wordText = String(original[mRange])
+            if wordIdx < isChanged.count && isChanged[wordIdx] {
+                result += open + wordText + close
+            } else {
+                result += wordText
+            }
+            lastEnd = mRange.upperBound
+            wordIdx += 1
+        }
+        result += original[lastEnd...]
+        return result
+    }
+
+    private func diffedMarkdownSourcesWordByWord(leftText: String, rightText: String) -> (left: String, right: String) {
+        let leftWords = extractWords(leftText)
+        let rightWords = extractWords(rightText)
+        let lcs = longestCommonSubsequence(leftWords, rightWords)
+
+        let leftMod = applyWordWrappers(to: leftText, sideWords: leftWords, lcs: lcs, open: "<del class=\"diff-removed\">", close: "</del>")
+        let rightMod = applyWordWrappers(to: rightText, sideWords: rightWords, lcs: lcs, open: "<ins class=\"diff-added\">", close: "</ins>")
 
         return (leftMod, rightMod)
     }
@@ -605,7 +619,7 @@ final class DocumentWindowController: NSWindowController {
             let rightLines = rightText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
             let (lAnn, rAnn) = annotatedLines(leftLines: leftLines, rightLines: rightLines)
 
-            let (leftDiffed, rightDiffed) = diffedMarkdownSources(leftText: leftText, rightText: rightText)
+            let (leftDiffed, rightDiffed) = diffedMarkdownSourcesWordByWord(leftText: leftText, rightText: rightText)
 
             let leftBody = MarkdownRenderer.render(text: leftDiffed, fileType: self.markdownDocument.fileType, allowUnsafeHTML: true)
             let rightBody = MarkdownRenderer.render(text: rightDiffed, fileType: self.markdownDocument.fileType, allowUnsafeHTML: true)

@@ -87,19 +87,19 @@ strong      { font-weight: 600; }
 del, s      { text-decoration: line-through; }
 ins, u      { text-decoration: underline; }
 
+del.diff-removed,
+ins.diff-added {
+  padding: 1px 2px;
+  border-radius: 2px;
+  /* keep inline so word-by-word diffs flow naturally inside paragraphs, lists, headings etc. */
+}
 del.diff-removed {
   background-color: var(--diff-removed-bg);
   color: var(--diff-removed-fg);
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
 }
 ins.diff-added {
   background-color: var(--diff-added-bg);
   color: var(--diff-added-fg);
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
 }
 kbd         { font-family: var(--code-font, monospace); font-size: 0.85em;
               border: 1px solid var(--color-border-default);
