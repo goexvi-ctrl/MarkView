@@ -451,6 +451,143 @@ final class DocumentWindowController: NSWindowController {
         await loadComparisonContent(left: left, right: right, showBanner: true)
     }
 
+    // MARK: - Line-based diff for H2.3 (implemented ourselves, no git diff)
+
+    private func longestCommonSubsequence(_ a: [String], _ b: [String]) -> [String] {
+        let m = a.count, n = b.count
+        var dp = Array(repeating: Array(repeating: 0, count: n + 1), count: m + 1)
+        for i in 1...m {
+            for j in 1...n {
+                if a[i-1] == b[j-1] {
+                    dp[i][j] = dp[i-1][j-1] + 1
+                } else {
+                    dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+                }
+            }
+        }
+        var res: [String] = []
+        var i = m, j = n
+        while i > 0 && j > 0 {
+            if a[i-1] == b[j-1] {
+                res.insert(a[i-1], at: 0)
+                i -= 1
+                j -= 1
+            } else if dp[i-1][j] > dp[i][j-1] {
+                i -= 1
+            } else {
+                j -= 1
+            }
+        }
+        return res
+    }
+
+    private func highlightSourceLine(_ line: String, isRemoved: Bool, isAdded: Bool) -> String {
+        guard isRemoved || isAdded else { return line }
+
+        let wrapperOpen = isRemoved ? "<del class=\"diff-removed\">" : "<ins class=\"diff-added\">"
+        let wrapperClose = isRemoved ? "</del>" : "</ins>"
+
+        // Preserve leading whitespace exactly.
+        let leading = line.prefix(while: { $0.isWhitespace })
+        let rest = String(line.dropFirst(leading.count))
+
+        // Common block-starting markers that must remain at the start of the (trimmed) line
+        // for cmark to recognize headings, lists, blockquotes, etc.
+        let markers = [
+            "# ", "## ", "### ", "#### ", "##### ", "###### ",
+            "- ", "* ", "+ ",
+            "1. ", "2. ", "3. ", "4. ", "5. ", "6. ", "7. ", "8. ", "9. ", "0. ",
+            "> ", ">> ", ">>> "
+        ]
+
+        for marker in markers {
+            if rest.hasPrefix(marker) {
+                let after = String(rest.dropFirst(marker.count))
+                return String(leading) + marker + wrapperOpen + after + wrapperClose
+            }
+        }
+
+        // Fenced code, indented code, or plain text / continuation lines: wrap the whole rest.
+        // For a fenced opener we wrap the whole line so the ``` stays visible as removed/added.
+        if rest.hasPrefix("```") || rest.hasPrefix("~~~") || rest.hasPrefix("    ") || rest.hasPrefix("\t") {
+            return String(leading) + wrapperOpen + rest + wrapperClose
+        }
+
+        // Default (paragraph text, etc.): wrap the content.
+        return String(leading) + wrapperOpen + rest + wrapperClose
+    }
+
+    private func annotatedLines(leftLines: [String], rightLines: [String]) -> (left: [(line: String, removed: Bool)], right: [(line: String, added: Bool)]) {
+        let lcs = longestCommonSubsequence(leftLines, rightLines)
+        var leftAnn: [(String, Bool)] = []
+        var rightAnn: [(String, Bool)] = []
+        var li = 0
+        var ri = 0
+        var ci = 0
+        while li < leftLines.count || ri < rightLines.count {
+            if ci < lcs.count {
+                // advance left to the current common
+                while li < leftLines.count && leftLines[li] != lcs[ci] {
+                    leftAnn.append((leftLines[li], true))
+                    li += 1
+                }
+                // advance right to the current common
+                while ri < rightLines.count && rightLines[ri] != lcs[ci] {
+                    rightAnn.append((rightLines[ri], true))
+                    ri += 1
+                }
+                // now output the common (if present)
+                if li < leftLines.count && ri < rightLines.count {
+                    leftAnn.append((leftLines[li], false))
+                    rightAnn.append((rightLines[ri], false))
+                    li += 1
+                    ri += 1
+                    ci += 1
+                } else {
+                    // one side exhausted the match
+                    break
+                }
+            } else {
+                // no more commons, emit remainders
+                while li < leftLines.count {
+                    leftAnn.append((leftLines[li], true))
+                    li += 1
+                }
+                while ri < rightLines.count {
+                    rightAnn.append((rightLines[ri], true))
+                    ri += 1
+                }
+                break
+            }
+        }
+        // any final remainders
+        while li < leftLines.count {
+            leftAnn.append((leftLines[li], true))
+            li += 1
+        }
+        while ri < rightLines.count {
+            rightAnn.append((rightLines[ri], true))
+            ri += 1
+        }
+        return (leftAnn, rightAnn)
+    }
+
+    private func diffedMarkdownSources(leftText: String, rightText: String) -> (left: String, right: String) {
+        let leftLines = leftText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let rightLines = rightText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let (leftAnn, rightAnn) = annotatedLines(leftLines: leftLines, rightLines: rightLines)
+
+        let leftMod = leftAnn.map { (line, removed) in
+            highlightSourceLine(line, isRemoved: removed, isAdded: false)
+        }.joined(separator: "\n")
+
+        let rightMod = rightAnn.map { (line, added) in
+            highlightSourceLine(line, isRemoved: false, isAdded: added)
+        }.joined(separator: "\n")
+
+        return (leftMod, rightMod)
+    }
+
     private func loadComparisonContent(left: GitVersion, right: GitVersion, showBanner: Bool) async {
         do {
             let leftText: String = left.isWorkingTree
@@ -460,11 +597,22 @@ final class DocumentWindowController: NSWindowController {
                 ? self.markdownDocument.text
                 : try await self.gitClient.content(at: right.sha, for: self.markdownDocument.fileURL)
 
-            let leftBody = MarkdownRenderer.render(text: leftText, fileType: self.markdownDocument.fileType)
-            let rightBody = MarkdownRenderer.render(text: rightText, fileType: self.markdownDocument.fileType)
+            // Smart source-line diff: we modify the *source* (preserving block markers like #, -, > etc.
+            // outside the wrapper) then render the whole modified document once per side.
+            // This keeps full Markdown structure (nested lists, TOCs, headings, etc.) while still
+            // highlighting differing source lines in red/green.
+            let (leftDiffed, rightDiffed) = diffedMarkdownSources(leftText: leftText, rightText: rightText)
 
-            let hunks = try await self.gitClient.diffHunks(from: left, to: right, for: self.markdownDocument.fileURL)
-            let stats = hunks.isEmpty ? "identical" : "\(hunks.count) region(s) changed"
+            let leftBody = MarkdownRenderer.render(text: leftDiffed, fileType: self.markdownDocument.fileType, allowUnsafeHTML: true)
+            let rightBody = MarkdownRenderer.render(text: rightDiffed, fileType: self.markdownDocument.fileType, allowUnsafeHTML: true)
+
+            // Stats from our line diff (no git diff).
+            let leftLines = leftText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            let rightLines = rightText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            let (lAnn, rAnn) = annotatedLines(leftLines: leftLines, rightLines: rightLines)
+            let removedCount = lAnn.filter { $0.1 }.count
+            let addedCount = rAnn.filter { $0.1 }.count
+            let stats = (removedCount == 0 && addedCount == 0) ? "identical" : "\(removedCount) removed, \(addedCount) added (source lines)"
 
             let html = HTMLTemplate.buildComparison(
                 leftBody: leftBody,

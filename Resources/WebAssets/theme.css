@@ -33,6 +33,11 @@ body {
     --color-blockquote-border:  #d0d7de;
     --color-table-border:       #d0d7de;
     --color-table-header-bg:    #f6f8fa;
+
+    --diff-removed-fg: #d73a49;
+    --diff-removed-bg: #ffeef0;
+    --diff-added-fg:   #28a745;
+    --diff-added-bg:   #e6ffed;
   }
 }
 
@@ -51,6 +56,11 @@ body {
     --color-blockquote-border:  #3d444d;
     --color-table-border:       #3d444d;
     --color-table-header-bg:    #161b22;
+
+    --diff-removed-fg: #f85149;
+    --diff-removed-bg: #490202;
+    --diff-added-fg:   #3fb950;
+    --diff-added-bg:   #0c2d0c;
   }
 }
 
@@ -76,6 +86,21 @@ em          { font-style: italic; }
 strong      { font-weight: 600; }
 del, s      { text-decoration: line-through; }
 ins, u      { text-decoration: underline; }
+
+del.diff-removed {
+  background-color: var(--diff-removed-bg);
+  color: var(--diff-removed-fg);
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+ins.diff-added {
+  background-color: var(--diff-added-bg);
+  color: var(--diff-added-fg);
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
 kbd         { font-family: var(--code-font, monospace); font-size: 0.85em;
               border: 1px solid var(--color-border-default);
               border-radius: 3px; padding: 2px 5px;
