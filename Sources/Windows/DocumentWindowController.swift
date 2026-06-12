@@ -112,7 +112,6 @@ final class DocumentWindowController: NSWindowController {
             self?.handleHistoryStep(delta: delta, newWindow: newWindow)
         }
 
-        print("GITNAV: DVC init: owning and handleHistoryStep wired on webVC (self=\(self))")
 
         window.contentViewController = webVC
 
@@ -303,7 +302,6 @@ final class DocumentWindowController: NSWindowController {
 
         dismissInfoPanel()  // the popup was for the previous revision; it is no longer accurate
 
-        print("GITNAV: APPLY HISTORICAL called for \(version.shortSha)")
 
         webVC.enterHistoricalView(version, text: text)
         isViewingHistory = true
@@ -528,434 +526,6 @@ final class DocumentWindowController: NSWindowController {
         await loadComparisonContent(left: left, right: right, showBanner: true)
     }
 
-    // MARK: - Line-based diff for H2.3 (implemented ourselves, no git diff)
-
-    private func longestCommonSubsequence(_ a: [String], _ b: [String]) -> [String] {
-        let m = a.count, n = b.count
-        var dp = Array(repeating: Array(repeating: 0, count: n + 1), count: m + 1)
-        for i in 1...m {
-            for j in 1...n {
-                if a[i-1] == b[j-1] {
-                    dp[i][j] = dp[i-1][j-1] + 1
-                } else {
-                    dp[i][j] = max(dp[i-1][j], dp[i][j-1])
-                }
-            }
-        }
-        var res: [String] = []
-        var i = m, j = n
-        while i > 0 && j > 0 {
-            if a[i-1] == b[j-1] {
-                res.insert(a[i-1], at: 0)
-                i -= 1
-                j -= 1
-            } else if dp[i-1][j] > dp[i][j-1] {
-                i -= 1
-            } else {
-                j -= 1
-            }
-        }
-        return res
-    }
-
-
-
-    private func annotatedLines(leftLines: [String], rightLines: [String]) -> (left: [(line: String, removed: Bool)], right: [(line: String, added: Bool)]) {
-        let lcs = longestCommonSubsequence(leftLines, rightLines)
-        var leftAnn: [(String, Bool)] = []
-        var rightAnn: [(String, Bool)] = []
-        var li = 0
-        var ri = 0
-        var ci = 0
-        while li < leftLines.count || ri < rightLines.count {
-            if ci < lcs.count {
-                // advance left to the current common
-                while li < leftLines.count && leftLines[li] != lcs[ci] {
-                    leftAnn.append((leftLines[li], true))
-                    li += 1
-                }
-                // advance right to the current common
-                while ri < rightLines.count && rightLines[ri] != lcs[ci] {
-                    rightAnn.append((rightLines[ri], true))
-                    ri += 1
-                }
-                // now output the common (if present)
-                if li < leftLines.count && ri < rightLines.count {
-                    leftAnn.append((leftLines[li], false))
-                    rightAnn.append((rightLines[ri], false))
-                    li += 1
-                    ri += 1
-                    ci += 1
-                } else {
-                    // one side exhausted the match
-                    break
-                }
-            } else {
-                // no more commons, emit remainders
-                while li < leftLines.count {
-                    leftAnn.append((leftLines[li], true))
-                    li += 1
-                }
-                while ri < rightLines.count {
-                    rightAnn.append((rightLines[ri], true))
-                    ri += 1
-                }
-                break
-            }
-        }
-        // any final remainders
-        while li < leftLines.count {
-            leftAnn.append((leftLines[li], true))
-            li += 1
-        }
-        while ri < rightLines.count {
-            rightAnn.append((rightLines[ri], true))
-            ri += 1
-        }
-        return (leftAnn, rightAnn)
-    }
-
-
-
-    // Word-by-word diff (H2.3 next step)
-    private func extractWords(_ text: String) -> [String] {
-        let regex = try! NSRegularExpression(pattern: "\\S+")
-        let range = NSRange(text.startIndex..., in: text)
-        return regex.matches(in: text, range: range).map { match in
-            let r = Range(match.range, in: text)!
-            return String(text[r])
-        }
-    }
-
-    private func applyWordWrappers(to original: String, sideWords: [String], lcs: [String], open: String, close: String) -> String {
-        // Mark which words on this side are not part of the LCS (i.e. removed or added)
-        var isChanged = Array(repeating: false, count: sideWords.count)
-        var wi = 0
-        var ci = 0
-        while wi < sideWords.count {
-            if ci < lcs.count && sideWords[wi] == lcs[ci] {
-                wi += 1
-                ci += 1
-            } else {
-                isChanged[wi] = true
-                wi += 1
-            }
-        }
-
-        // Find word matches in original order and wrap the changed ones
-        let regex = try! NSRegularExpression(pattern: "\\S+")
-        let range = NSRange(original.startIndex..., in: original)
-        let matches = regex.matches(in: original, range: range)
-
-        var result = ""
-        var lastEnd = original.startIndex
-        var wordIdx = 0
-
-        for match in matches {
-            let mRange = Range(match.range, in: original)!
-            result += original[lastEnd..<mRange.lowerBound]
-
-            let wordText = String(original[mRange])
-            if wordIdx < isChanged.count && isChanged[wordIdx] {
-                result += open + wordText + close
-            } else {
-                result += wordText
-            }
-            lastEnd = mRange.upperBound
-            wordIdx += 1
-        }
-        result += original[lastEnd...]
-        return result
-    }
-
-    private func diffedMarkdownSourcesWordByWord(leftText: String, rightText: String) -> (left: String, right: String) {
-        // Atomize math regions so that diff markup is never injected *inside* LaTeX delimiters.
-        // Changed math formulas get wrapped at the formula level with <span class="diff-xxx">
-        // (keeping the actual content of each version clean so KaTeX always renders properly).
-        // The span provides the marker class and background tint so the user sees which
-        // formulas differ (e.g. the E=Mc^2 vs E=mc^2 case will have red tint on left formula,
-        // green tint on right formula, and the actual M vs m will be visible by comparing the panes).
-        let leftAtom = atomizeMath(leftText)
-        let rightAtom = atomizeMath(rightText)
-
-        let leftWords = extractWords(leftAtom.skeleton)
-        let rightWords = extractWords(rightAtom.skeleton)
-        let lcs = longestCommonSubsequence(leftWords, rightWords)
-
-        let leftWrapped = applyWordWrappers(to: leftAtom.skeleton, sideWords: leftWords, lcs: lcs, open: "<del class=\"diff-removed\">", close: "</del>")
-        let rightWrapped = applyWordWrappers(to: rightAtom.skeleton, sideWords: rightWords, lcs: lcs, open: "<ins class=\"diff-added\">", close: "</ins>")
-
-        // For math, we always restore the *original clean* math content of that side
-        // inside the diff span. No automatic injection of \\color/\\cancel into the math source
-        // (that was causing complex formulas like the quadratic to fail to render in KaTeX).
-        // Users can still manually add \\color/\\cancel in their documents for custom annotation;
-        // the clean source + atomization ensures they will render.
-        let leftRestored = restoreMathInWrapped(leftWrapped, using: leftAtom.placeholders)
-        let rightRestored = restoreMathInWrapped(rightWrapped, using: rightAtom.placeholders)
-
-        return (leftRestored, rightRestored)
-    }
-
-    // MARK: - Math-aware diff atomization (prevents breaking KaTeX when formulas differ)
-
-    private struct MathAtomization {
-        /// Text with math expressions replaced by unique placeholders (no whitespace).
-        let skeleton: String
-        /// placeholder -> original math source (including its delimiters)
-        let placeholders: [String: String]
-        /// Ordered list of the full delimited math strings as they appeared in the text (for pairing across sides).
-        let orderedMaths: [String]
-    }
-
-    /// Replace every math region with a single atomic placeholder token.
-    /// This lets the normal word-level LCS treat a whole formula as one "word".
-    /// Code blocks/spans are left alone (per-word diff inside code is usually fine and desired).
-    private func atomizeMath(_ text: String) -> MathAtomization {
-        var skeleton = ""
-        var placeholders: [String: String] = [:]
-        var orderedMaths: [String] = []
-        var phIndex = 0
-        var i = text.startIndex
-
-        func nextPlaceholder() -> String {
-            let p = "\u{0001}M\(phIndex)\u{0001}"
-            phIndex += 1
-            return p
-        }
-
-        func appendMath(_ math: String) {
-            let p = nextPlaceholder()
-            placeholders[p] = math
-            orderedMaths.append(math)
-            skeleton += p
-        }
-
-        while i < text.endIndex {
-            let ch = text[i]
-
-            // --- Fenced code: copy verbatim (do not atomize inside) ---
-            if (ch == "`" || ch == "~") {
-                let atLineStart = i == text.startIndex || text[text.index(before: i)] == "\n"
-                if atLineStart {
-                    let fenceCount = text[i...].prefix(while: { $0 == ch }).count
-                    if fenceCount >= 3 {
-                        let fence = String(repeating: ch, count: fenceCount)
-                        // Find the start of the closing fence line (a \n followed by the fence)
-                        // and copy the entire block as-is.
-                        let searchStart = text.index(i, offsetBy: fenceCount)
-                        if let closing = text[searchStart...].range(of: "\n" + fence) {
-                            // Include from opening up to the end of the closing fence line
-                            var end = text.index(closing.upperBound, offsetBy: fenceCount)
-                            if end < text.endIndex, text[end] == "\n" {
-                                end = text.index(after: end)
-                            } else if end < text.endIndex {
-                                // rare: no \n after closer, take what we have
-                            }
-                            skeleton += text[i..<end]
-                            i = end
-                            continue
-                        } else {
-                            // Unclosed fence: copy the rest
-                            skeleton += text[i...]
-                            i = text.endIndex
-                            continue
-                        }
-                    }
-                }
-            }
-
-            // --- Inline code `...` : copy verbatim ---
-            if ch == "`" {
-                var j = i
-                while j < text.endIndex && text[j] == "`" { j = text.index(after: j) }
-                let ticks = String(text[i..<j])
-                if let close = text.range(of: ticks, range: j..<text.endIndex) {
-                    skeleton += text[i..<close.upperBound]
-                    i = close.upperBound
-                    continue
-                }
-            }
-
-            // --- Display math $$...$$ ---
-            if ch == "$", text[i...].hasPrefix("$$") {
-                let after = text.index(i, offsetBy: 2)
-                if let closeRange = text.range(of: "$$", range: after..<text.endIndex) {
-                    let end = text.index(closeRange.lowerBound, offsetBy: 2)
-                    appendMath(String(text[i..<end]))
-                    i = end
-                    continue
-                }
-            }
-
-            // --- Display \[ ... \] ---
-            if text[i...].hasPrefix("\\[") {
-                let after = text.index(i, offsetBy: 2)
-                if let closeRange = text.range(of: "\\]", range: after..<text.endIndex) {
-                    let end = text.index(closeRange.lowerBound, offsetBy: 2)
-                    appendMath(String(text[i..<end]))
-                    i = end
-                    continue
-                }
-            }
-
-            // --- Inline \( ... \) ---
-            if text[i...].hasPrefix("\\(") {
-                let after = text.index(i, offsetBy: 2)
-                if let closeRange = text.range(of: "\\)", range: after..<text.endIndex) {
-                    let end = text.index(closeRange.lowerBound, offsetBy: 2)
-                    appendMath(String(text[i..<end]))
-                    i = end
-                    continue
-                }
-            }
-
-            // --- Inline $...$ (single line, no leading/trailing space before closer) ---
-            if ch == "$" {
-                let after = text.index(after: i)
-                if after < text.endIndex,
-                   text[after] != "$",
-                   text[after] != " ",
-                   text[after] != "\n" {
-                    var j = after
-                    var found = false
-                    while j < text.endIndex && text[j] != "\n" {
-                        if text[j] == "$", text.index(before: j) >= text.startIndex, text[text.index(before: j)] != " " {
-                            appendMath(String(text[i...j]))
-                            i = text.index(after: j)
-                            found = true
-                            break
-                        }
-                        j = text.index(after: j)
-                    }
-                    if found { continue }
-                }
-            }
-
-            // Normal character
-            skeleton.append(ch)
-            i = text.index(after: i)
-        }
-
-        return MathAtomization(skeleton: skeleton, placeholders: placeholders, orderedMaths: orderedMaths)
-    }
-
-    private func insertColorIntoMath(_ fullMath: String, color: String) -> String {
-        if fullMath.hasPrefix("$$") && fullMath.hasSuffix("$$") && fullMath.count > 4 {
-            let inner = String(fullMath.dropFirst(2).dropLast(2))
-            return "$$\\color{" + color + "}" + inner + "$$"
-        }
-        if fullMath.hasPrefix("$") && fullMath.hasSuffix("$") && fullMath.count > 2 && !fullMath.hasPrefix("$$") {
-            let inner = String(fullMath.dropFirst().dropLast())
-            return "$\\color{" + color + "}" + inner + "$"
-        }
-        if fullMath.hasPrefix("\\[") && fullMath.hasSuffix("\\]") && fullMath.count > 4 {
-            let inner = String(fullMath.dropFirst(2).dropLast(2))
-            return "\\[\\color{" + color + "}" + inner + "\\]"
-        }
-        if fullMath.hasPrefix("\\(") && fullMath.hasSuffix("\\)") && fullMath.count > 4 {
-            let inner = String(fullMath.dropFirst(2).dropLast(2))
-            return "\\(\\color{" + color + "}" + inner + "\\)"
-        }
-        return fullMath
-    }
-
-    /// Given a skeleton that may contain <del class="diff-removed">PH</del> / <ins class="diff-added">PH</ins> (or bare PH),
-    /// replace the placeholders. For math PHs that were changed (wrapped), insert \color{red} or \color{green}
-    /// right after the opening delimiter so the entire formula renders in that color.
-    /// The <span class="diff-xxx"> is kept for scrollbar markers.
-    /// This guarantees clean LaTeX source for KaTeX while still showing the diff via color.
-    private func restoreMathInWrapped(_ wrapped: String, using map: [String: String], annotatedMap: [String: String] = [:]) -> String {
-        var result = wrapped
-        for (ph, original) in map {
-            let escaped = NSRegularExpression.escapedPattern(for: ph)
-
-            let isMath = original.hasPrefix("$") || original.hasPrefix("\\(") || original.hasPrefix("\\[")
-
-            // Changed math on the "removed" (left/older) side -> red
-            let delPattern = "<del([^>]*)>\(escaped)</del>"
-            if let regex = try? NSRegularExpression(pattern: delPattern) {
-                let ns = NSRange(result.startIndex..<result.endIndex, in: result)
-                let toInsert = isMath ? insertColorIntoMath(original, color: "red") : original
-                result = regex.stringByReplacingMatches(in: result, range: ns, withTemplate: "<span class=\"diff-removed\">" + toInsert + "</span>")
-            }
-
-            // Changed math on the "added" (right/newer) side -> green
-            let insPattern = "<ins([^>]*)>\(escaped)</ins>"
-            if let regex = try? NSRegularExpression(pattern: insPattern) {
-                let ns = NSRange(result.startIndex..<result.endIndex, in: result)
-                let toInsert = isMath ? insertColorIntoMath(original, color: "green") : original
-                result = regex.stringByReplacingMatches(in: result, range: ns, withTemplate: "<span class=\"diff-added\">" + toInsert + "</span>")
-            }
-
-            // Bare placeholder (unchanged) - restore clean original
-            if !result.contains(ph) { // already replaced if it was wrapped
-                result = result.replacingOccurrences(of: ph, with: original)
-            }
-        }
-        return result
-    }
-
-    // MARK: - Math diff annotation using LaTeX color/cancel for intra-formula visual diff
-
-    private func splitMathDelimiters(_ full: String) -> (open: String, content: String, close: String)? {
-        if full.hasPrefix("$$") && full.hasSuffix("$$") && full.count > 4 {
-            let content = String(full.dropFirst(2).dropLast(2))
-            return ("$$", content, "$$")
-        }
-        if full.hasPrefix("\\[") && full.hasSuffix("\\]") && full.count > 4 {
-            let content = String(full.dropFirst(2).dropLast(2))
-            return ("\\[", content, "\\]")
-        }
-        if full.hasPrefix("\\(") && full.hasSuffix("\\)") && full.count > 4 {
-            let content = String(full.dropFirst(2).dropLast(2))
-            return ("\\(", content, "\\)")
-        }
-        if full.hasPrefix("$") && full.hasSuffix("$") && full.count > 2 && !full.hasPrefix("$$") {
-            let content = String(full.dropFirst().dropLast())
-            return ("$", content, "$")
-        }
-        return nil
-    }
-
-    /// Given two full delimited math strings (e.g. "$E = Mc^2$" and "$E = mc^2$"),
-    /// compute word-level diff on their content and return versions with LaTeX
-    /// color/cancel annotations for the differing parts, preserving the original delimiters.
-    /// This produces sources like "$E = {\\color{red}\\cancel{M}}c^2$" on the removed side
-    /// and "$E = {\\color{green}{m}}c^2$" on the added side.
-    private func createAnnotatedMathPair(leftFullMath: String, rightFullMath: String) -> (left: String, right: String) {
-        guard let lparts = splitMathDelimiters(leftFullMath),
-              let rparts = splitMathDelimiters(rightFullMath) else {
-            return (leftFullMath, rightFullMath)
-        }
-        let leftContent = lparts.content
-        let rightContent = rparts.content
-
-        let leftWords = extractWords(leftContent)
-        let rightWords = extractWords(rightContent)
-        let lcs = longestCommonSubsequence(leftWords, rightWords)
-
-        // For the "left" side (older/removed changes): use red cancel for removed words
-        let leftAnnContent = applyWordWrappers(
-            to: leftContent,
-            sideWords: leftWords,
-            lcs: lcs,
-            open: "{\\color{red}\\cancel{",
-            close: "}}"
-        )
-        // For the "right" side (newer/added changes): use green for added words
-        let rightAnnContent = applyWordWrappers(
-            to: rightContent,
-            sideWords: rightWords,
-            lcs: lcs,
-            open: "{\\color{green}{",
-            close: "}}"
-        )
-
-        let leftAnn = lparts.open + leftAnnContent + lparts.close
-        let rightAnn = rparts.open + rightAnnContent + rparts.close
-        return (leftAnn, rightAnn)
-    }
-
     /// Shared helper: given two source texts (already the versions to compare), labels,
     /// and per-side file types, run the line/word diff annotation, render both sides
     /// (preserving structure via injected <del>/<ins> in the Markdown source), build
@@ -970,12 +540,15 @@ final class DocumentWindowController: NSWindowController {
     ) -> (html: String, stats: String) {
         let leftLines = leftText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let rightLines = rightText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        let (lAnn, rAnn) = annotatedLines(leftLines: leftLines, rightLines: rightLines)
+        let (lAnn, rAnn) = DiffAnnotator.annotatedLines(leftLines: leftLines, rightLines: rightLines)
 
-        let (leftDiffed, rightDiffed) = diffedMarkdownSourcesWordByWord(leftText: leftText, rightText: rightText)
+        let (leftDiffed, rightDiffed) = DiffAnnotator.diffedMarkdownSourcesWordByWord(leftText: leftText, rightText: rightText)
 
-        let leftBody = MarkdownRenderer.render(text: leftDiffed, fileType: leftFileType, allowUnsafeHTML: true)
-        let rightBody = MarkdownRenderer.render(text: rightDiffed, fileType: rightFileType, allowUnsafeHTML: true)
+        // Respect the user's sanitizer setting; the injected diff markup
+        // (del/ins/span/div with class) survives the GitHub-style allowlist.
+        let allowUnsafe = SettingsStore.shared.allowUnsafeHTML
+        let leftBody = MarkdownRenderer.render(text: leftDiffed, fileType: leftFileType, allowUnsafeHTML: allowUnsafe)
+        let rightBody = MarkdownRenderer.render(text: rightDiffed, fileType: rightFileType, allowUnsafeHTML: allowUnsafe)
 
         let removedCount = lAnn.filter { $0.1 }.count
         let addedCount = rAnn.filter { $0.1 }.count
@@ -1118,7 +691,7 @@ final class DocumentWindowController: NSWindowController {
     /// Re-reads both current on-disk texts, recomputes the diff annotation + render,
     /// and reloads the comparison surface while attempting to preserve pane scroll positions.
     private func refreshFileComparison() {
-        guard let state = fileComparison,
+        guard fileComparison != nil,
               let webVC = webViewController else { return }
 
         webVC.captureComparisonScrolls { [weak self] leftY, rightY in
@@ -1273,7 +846,6 @@ final class DocumentWindowController: NSWindowController {
     func handleHistoryStep(delta: Int, newWindow: Bool) {
         guard delta != 0 else { return }
 
-        print("GITNAV: handleHistoryStep delta=\(delta) newW=\(newWindow) isViewing=\(isViewingHistory) cur=\(currentHistoryIndex) listCnt=\(historyVersions.count)")
 
         Task { [weak self] in
             await self?.performHistoryStep(delta: delta, newWindow: newWindow)
@@ -1311,14 +883,12 @@ final class DocumentWindowController: NSWindowController {
 
         guard !historyVersions.isEmpty else { return }
 
-        print("GITNAV: perform entered: viewing=\(isViewingHistory) curIdx=\(currentHistoryIndex) listCnt=\(historyVersions.count) delta=\(delta) newW=\(newWindow)")
 
         // Special fast path for the very common case the user cares about:
         // From live (index 0), plain older step (<) → immediately go to the first real
         // historical revision (index 1) in the current window. This makes repeated "<"
         // from live after returning via ">" work reliably.
         if currentHistoryIndex == 0 && delta < 0 && !newWindow && historyVersions.count > 1 {
-            print("GITNAV: SPECIAL FAST PATH TRIGGERED for delta<0 from live, targeting [1]")
             let firstHist = historyVersions[1]
             if !firstHist.isWorkingTree {
                 do {
@@ -1341,7 +911,6 @@ final class DocumentWindowController: NSWindowController {
                                   currentHistoryIndex + (delta > 0 ? -1 : +1)))
 
         if newIndex == currentHistoryIndex {
-            print("GITNAV: GENERAL early return newIndex==current (\(newIndex))")
             // Already at the live end or the oldest revision we know about.
             return
         }
@@ -1355,7 +924,6 @@ final class DocumentWindowController: NSWindowController {
 
         // In-place step in the current window.
         if targetVersion.isWorkingTree {
-            print("GITNAV: HIT WT sentinel in step, calling exit")
             exitHistoricalView()
         } else {
             do {

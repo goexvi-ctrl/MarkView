@@ -185,13 +185,6 @@ enum HTMLTemplate {
           }
           .left-track .diff-marker { background-color: #d73a49; }
           .right-track .diff-marker { background-color: #28a745; }
-          .compare-pane {
-            flex: 1 1 0;
-            min-width: 0;
-            overflow: auto;
-            padding: 12px 16px;
-            box-sizing: border-box;
-          }
           .pane-with-gutter + .pane-with-gutter .compare-pane {
             border-left: 1px solid #d0d7de;
           }
@@ -453,36 +446,6 @@ enum HTMLTemplate {
               //      $E = {\\color{red}\\cancel{M}}c^2$
               //    The atomization in the Swift diff code ensures that even when only part
               //    of a formula differs, the LaTeX source fed to KaTeX stays clean.
-
-              // Debug: log the exact math formulas (as they appear in the DOM text nodes / .math-display)
-              // *before* we call renderMathInElement. This lets us see whether \\color, \\cancel etc.
-              // survived the diff source rewriting and the Swift math protection pass.
-              console.log('=== [MarkView Diff Debug] Math source reaching KaTeX (before render) ===');
-              const debugPanes = [
-                { el: document.getElementById('left-pane'), side: 'LEFT (older)' },
-                { el: document.getElementById('right-pane'), side: 'RIGHT (newer)' }
-              ];
-              debugPanes.forEach(function(p) {
-                if (!p.el) return;
-                // Display math (protected by Swift into .math-display divs)
-                p.el.querySelectorAll('.math-display').forEach(function(div) {
-                  const src = (div.textContent || div.innerText || '').trim();
-                  if (src) console.log(p.side + ' [DISPLAY]: ' + src);
-                });
-                // Inline math: walk text nodes for anything that still has $ \\( \\[ after cmark
-                const walker = document.createTreeWalker(p.el, NodeFilter.SHOW_TEXT);
-                let n;
-                while ((n = walker.nextNode())) {
-                  const t = n.textContent || '';
-                  if (t.indexOf('$') !== -1 || t.indexOf('\\\\(') !== -1 || t.indexOf('\\\\[') !== -1) {
-                    // Log the raw text chunk (may contain surrounding text + the $math$)
-                    const short = t.length > 300 ? t.substring(0, 300) + '...' : t;
-                    console.log(p.side + ' [inline-ish]: ' + short);
-                  }
-                }
-              });
-              console.log('=== end math debug log ===');
-
               if (typeof renderMathInElement === 'function') {
                 try {
                   renderMathInElement(document.body, {

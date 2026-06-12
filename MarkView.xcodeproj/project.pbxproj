@@ -28,17 +28,14 @@
 		5F002033000000000000BBBB /* AssetSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001033000000000000BBBB /* AssetSchemeHandler.swift */; };
 		5F002034000000000000BBBB /* LinkClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001034000000000000BBBB /* LinkClassifier.swift */; };
 		5F002035000000000000BBBB /* HTMLSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001035000000000000BBBB /* HTMLSanitizer.swift */; };
+		5F002036000000000000BBBB /* DiffAnnotator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001036000000000000BBBB /* DiffAnnotator.swift */; };
 		5F002040000000000000BBBB /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001040000000000000BBBB /* SettingsStore.swift */; };
 		5F002041000000000000BBBB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001041000000000000BBBB /* SettingsView.swift */; };
 		5F002042000000000000BBBB /* FontPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001042000000000000BBBB /* FontPicker.swift */; };
 		5F002053000000000000BBBB /* WebAssets in Resources */ = {isa = PBXBuildFile; fileRef = 5F001053000000000000BBBB /* WebAssets */; };
 		5F002054000000000000BBBB /* MarkdownCheatSheet.md in Resources */ = {isa = PBXBuildFile; fileRef = 5F001054000000000000BBBB /* MarkdownCheatSheet.md */; };
 		5F002055000000000000BBBB /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 5F001055000000000000BBBB /* AppIcon.icns */; };
-		5F003080000000000000BBBB /* RendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001080000000000000BBBB /* RendererTests.swift */; };
 		5F003085000000000000BBBB /* GoldenRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001085000000000000BBBB /* GoldenRendererTests.swift */; };
-		5F003081000000000000BBBB /* DocumentKeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001081000000000000BBBB /* DocumentKeyTests.swift */; };
-		5F003082000000000000BBBB /* LinkClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001082000000000000BBBB /* LinkClassifierTests.swift */; };
-		5F003083000000000000BBBB /* HeadingSluggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001083000000000000BBBB /* HeadingSluggerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,6 +68,7 @@
 		5F001033000000000000BBBB /* AssetSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetSchemeHandler.swift; sourceTree = "<group>"; };
 		5F001034000000000000BBBB /* LinkClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkClassifier.swift; sourceTree = "<group>"; };
 		5F001035000000000000BBBB /* HTMLSanitizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLSanitizer.swift; sourceTree = "<group>"; };
+		5F001036000000000000BBBB /* DiffAnnotator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffAnnotator.swift; sourceTree = "<group>"; };
 		5F001040000000000000BBBB /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
 		5F001041000000000000BBBB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		5F001042000000000000BBBB /* FontPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontPicker.swift; sourceTree = "<group>"; };
@@ -207,6 +205,7 @@
 				5F001033000000000000BBBB /* AssetSchemeHandler.swift */,
 				5F001034000000000000BBBB /* LinkClassifier.swift */,
 				5F001035000000000000BBBB /* HTMLSanitizer.swift */,
+				5F001036000000000000BBBB /* DiffAnnotator.swift */,
 			);
 			path = Render;
 			sourceTree = "<group>";
@@ -364,6 +363,7 @@
 				5F002033000000000000BBBB /* AssetSchemeHandler.swift in Sources */,
 				5F002034000000000000BBBB /* LinkClassifier.swift in Sources */,
 				5F002035000000000000BBBB /* HTMLSanitizer.swift in Sources */,
+				5F002036000000000000BBBB /* DiffAnnotator.swift in Sources */,
 				5F002040000000000000BBBB /* SettingsStore.swift in Sources */,
 				5F002041000000000000BBBB /* SettingsView.swift in Sources */,
 				5F002042000000000000BBBB /* FontPicker.swift in Sources */,
@@ -374,11 +374,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5F003080000000000000BBBB /* RendererTests.swift in Sources */,
 				5F003085000000000000BBBB /* GoldenRendererTests.swift in Sources */,
-				5F003081000000000000BBBB /* DocumentKeyTests.swift in Sources */,
-				5F003082000000000000BBBB /* LinkClassifierTests.swift in Sources */,
-				5F003083000000000000BBBB /* HeadingSluggerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

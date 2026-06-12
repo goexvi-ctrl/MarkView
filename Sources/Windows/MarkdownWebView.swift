@@ -300,16 +300,6 @@ final class MarkdownWebViewController: NSViewController {
         }
     }
 
-    private func buildHTML() -> String {
-        let body = MarkdownRenderer.render(document: document)
-        return HTMLTemplate.build(
-            body: body,
-            settings: SettingsStore.shared,
-            zoomFactor: currentZoom,
-            nonce: nonce
-        )
-    }
-
     // MARK: - Bridge calls (Swift -> JS)
 
     func setZoom(_ factor: Double) {

@@ -16,6 +16,7 @@ let package = Package(
             path: "Sources",
             sources: [
                 "Model/DocumentKey.swift",
+                "Render/DiffAnnotator.swift",
                 "Render/HeadingSlugger.swift",
                 "Render/LinkClassifier.swift",
             ]

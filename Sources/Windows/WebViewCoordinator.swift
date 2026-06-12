@@ -110,7 +110,6 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
         case "historyStep":
             if let delta = payload["delta"] as? Int,
                let newWindow = payload["newWindow"] as? Bool {
-                print("GITNAV: RX historyStep delta=\(delta) newW=\(newWindow) viewingHist=\(vc.isViewingHistoricalVersion) owning=\(vc.owningDocumentWindowController != nil) closure=\(vc.handleHistoryStep != nil)")
                 if let dvc = vc.owningDocumentWindowController {
                     dvc.handleHistoryStep(delta: delta, newWindow: newWindow)
                 } else {

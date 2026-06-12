@@ -33,6 +33,9 @@ enum HTMLSanitizer {
         // class allowed on block/inline containers (e.g. math-display, mermaid)
         "div":     ["class", "id"],
         "span":    ["class", "id"],
+        // class needed for the comparison view's diff-removed/diff-added markers
+        "del":     ["class"],
+        "ins":     ["class"],
     ]
 
     // MARK: - Sanitize
