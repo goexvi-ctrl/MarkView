@@ -191,21 +191,10 @@ Keep this file ASCII-only.
   gesture after highlighting text.
 
   Live (during-gesture) visual feedback for the magnification path may still be
-  limited or absent (see original platform notes below); final value applies on
-  gesture end. The old experimental attempts (pageZoom, JS transform during
-  .changed, CALayer wrapper) are no longer relevant since we now rely on native
-  magnification for the visual path.
-
-  (Mermaid diagrams remain broken / non-functional per separate note; not addressed
-  in this session.)
-
-  Live (during-gesture) visual feedback for the magnification path may still be
-  limited or absent due to WebKit's asynchronous rendering and gesture handling
-  (see historical platform notes in prior version of this entry). The final
-  magnification value applies on gesture end.
-
-  (Mermaid diagrams remain broken / non-functional per separate note; not addressed
-  in this session.)
+  limited or absent due to WebKit's asynchronous rendering and gesture handling;
+  the final magnification value applies on gesture end. The old experimental
+  attempts (pageZoom, JS transform during .changed, CALayer wrapper) are no
+  longer relevant since we now rely on native magnification for the visual path.
 
 - [DONE] BUG-1 (was) Mermaid diagrams rendered via BeautifulMermaid (a from-scratch
   reimplementation) produced poor results and only supported a subset of syntax.
@@ -266,9 +255,13 @@ phasing (A then B then C), and constraints from Design.md.
   loads via dedicated `loadComparisonHTML`. Native InfoBanner with "Return to
   document" action that exits and reloads. Title updated. Basic (no full picker
   or hunk-driven tinting yet).
-- [NEW] H2.3 Red/green visual treatment on the rendered content (hunk/block level
-  tints, borders, or markers using new CSS vars in theme.css that respect light/dark;
-  leverage existing del/ins where helpful). "Compare with previous" and picker.
+- [CODED] H2.3 Red/green visual treatment on the rendered content. Implemented as
+  word-level del/ins tints (diff-removed/diff-added classes) injected into the
+  Markdown source before rendering, plus custom per-pane scrollbars with diff
+  position markers, and dual titlebar revision pickers in git comparison mode.
+  Diff annotation now lives in Render/DiffAnnotator.swift (SPM-testable; see
+  Tests/DiffAnnotatorTests.swift). Remaining from the original scope: theme.css
+  CSS vars for dark mode tints and a dedicated "Compare with previous" command.
 - [NEW] H2.4 From compare surface: open either side as a normal (or historical)
   document window; swap sides.
 - [NEW] H3.1 (after H2) Scroll sync + prev/next hunk navigation so unchanged

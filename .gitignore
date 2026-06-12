@@ -22,3 +22,6 @@ build/
 .LSOverride
 ._*
 Thumbs.db
+
+# Xcode user state anywhere (incl. workspaces inside vendored packages)
+xcuserdata/
