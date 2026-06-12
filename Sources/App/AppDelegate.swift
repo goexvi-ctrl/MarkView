@@ -148,6 +148,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Real (non-git) command: from the focused document window, let the user pick a
+    /// second local file and open a side-by-side rendered diff against it.
+    @objc func compareDocumentWithFile(_ sender: Any?) {
+        guard let controller = DocumentWindowRegistry.shared.focusedController() else { return }
+        controller.compareWithOtherFile()
+    }
+
     @objc func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(debugViewFirstHistoricalVersion(_:)) {
             guard let controller = DocumentWindowRegistry.shared.focusedController() else {
@@ -160,6 +167,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return false
             }
             return controller.isInGitRepository
+        }
+        if menuItem.action == #selector(compareDocumentWithFile(_:)) {
+            return DocumentWindowRegistry.shared.focusedController() != nil
         }
         return true
     }

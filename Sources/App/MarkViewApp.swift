@@ -82,6 +82,13 @@ struct MarkViewApp: App {
                 }
                 .keyboardShortcut("r", modifiers: .command)
 
+                Button("Compare with File...") {
+                    NSApp.sendAction(#selector(AppDelegate.compareDocumentWithFile(_:)), to: nil, from: nil)
+                }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+
+                Divider()
+
                 // Temporary H1 debug hook. Opens the first prior git version of the
                 // current document (if any) using the new historical recall path.
                 Button("Debug: View First Historical (git)") {

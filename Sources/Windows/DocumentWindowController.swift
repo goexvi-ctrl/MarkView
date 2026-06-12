@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import UniformTypeIdentifiers
 
 @MainActor
 final class DocumentWindowController: NSWindowController {
@@ -44,6 +45,25 @@ final class DocumentWindowController: NSWindowController {
     /// Indices into historyVersions for the current left and right panes while in comparison mode.
     private var comparisonLeftIndex: Int = 0
     private var comparisonRightIndex: Int = 0
+
+    /// When non-nil, we are in a non-git file-to-file comparison (left = primary document in this window,
+    /// right = a user-chosen second file). We keep the URLs so we can watch the second file for live
+    /// updates and re-read fresh content for either side when either changes on disk.
+    private var fileComparison: FileComparisonState?
+
+    private struct FileComparisonState {
+        let leftURL: URL
+        let rightURL: URL
+        let leftLabel: String
+        let rightLabel: String
+        let leftFileType: MarkdownDocument.FileType
+        let rightFileType: MarkdownDocument.FileType
+    }
+
+    /// Separate watcher for the "right hand" file while in a file-to-file (non-git) comparison.
+    /// The primary document always has its own fileWatcher (whose callback dispatches to
+    /// refresh when fileComparison is active).
+    private var comparisonPartnerWatcher: FileWatcher?
 
     /// The (optional) info popup panel for this window. We keep at most one per DWC
     /// so that repeated presses of the titlebar ⓘ reuse it instead of spawning multiples.
@@ -274,9 +294,8 @@ final class DocumentWindowController: NSWindowController {
     /// Configure this controller to show a specific historical revision (used both
     /// for in-place recall and for newly opened historical snapshot windows).
     private func applyHistoricalContent(version: GitVersion, text: String) {
-        if comparisonVersions != nil {
-            // Stale single-view path while we are in comparison mode.
-            // Force the titlebar back to dual selectors and bail.
+        if comparisonVersions != nil || fileComparison != nil {
+            // Stale single-view path while we are in (git or file) comparison mode.
             updateRevisionControls()
             return
         }
@@ -324,8 +343,8 @@ final class DocumentWindowController: NSWindowController {
     }
 
     func exitHistoricalView() {
-        if comparisonVersions != nil {
-            // Stale single-view path while we are in comparison mode.
+        if comparisonVersions != nil || fileComparison != nil {
+            // Stale single-view path while we are in (git or file) comparison mode.
             updateRevisionControls()
             return
         }
@@ -403,6 +422,64 @@ final class DocumentWindowController: NSWindowController {
                     "Compare failed: \(error.localizedDescription)",
                     style: .error, autoDismiss: true
                 )
+            }
+        }
+    }
+
+    // MARK: - Non-git file-to-file comparison
+
+    /// Prompts the user to choose a second local file (.md/.markdown/.txt) and diffs
+    /// the primary document's current on-disk content against it using the same
+    /// side-by-side rendered comparison surface. Does not involve git at all.
+    func compareWithOtherFile() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose File to Compare Against"
+        panel.prompt = "Compare"
+        panel.allowedContentTypes = [
+            UTType(importedAs: "net.daringfireball.markdown"),
+            .plainText
+        ]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.directoryURL = markdownDocument.directoryURL
+
+        guard panel.runModal() == .OK, let secondURL = panel.urls.first else { return }
+
+        performComparisonAgainstFile(secondURL)
+    }
+
+    private func performComparisonAgainstFile(_ secondURL: URL) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let secondDoc = try MarkdownDocument(url: secondURL)
+
+                // Snapshot the primary side from this document's live text (even if the
+                // window is currently showing a git historical snapshot, the "first file"
+                // side for a file-compare is the on-disk state of the primary document).
+                let leftText = self.markdownDocument.text
+                let leftLabel = self.markdownDocument.displayTitle
+                let rightText = secondDoc.text
+                let rightLabel = secondDoc.displayTitle
+                let baseDir = self.markdownDocument.directoryURL
+
+                await self.loadFileComparisonContent(
+                    leftText: leftText,
+                    rightText: rightText,
+                    leftLabel: leftLabel,
+                    rightLabel: rightLabel,
+                    baseURL: baseDir,
+                    leftFileType: self.markdownDocument.fileType,
+                    rightFileType: secondDoc.fileType,
+                    rightURL: secondURL
+                )
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.webViewController?.showBanner(
+                        "Could not load second file for comparison: \(error.localizedDescription)",
+                        style: .error, autoDismiss: true
+                    )
+                }
             }
         }
     }
@@ -592,14 +669,328 @@ final class DocumentWindowController: NSWindowController {
     }
 
     private func diffedMarkdownSourcesWordByWord(leftText: String, rightText: String) -> (left: String, right: String) {
-        let leftWords = extractWords(leftText)
-        let rightWords = extractWords(rightText)
+        // Atomize math regions so that diff markup is never injected *inside* LaTeX delimiters.
+        // Changed math formulas get wrapped at the formula level with <span class="diff-xxx">
+        // (keeping the actual content of each version clean so KaTeX always renders properly).
+        // The span provides the marker class and background tint so the user sees which
+        // formulas differ (e.g. the E=Mc^2 vs E=mc^2 case will have red tint on left formula,
+        // green tint on right formula, and the actual M vs m will be visible by comparing the panes).
+        let leftAtom = atomizeMath(leftText)
+        let rightAtom = atomizeMath(rightText)
+
+        let leftWords = extractWords(leftAtom.skeleton)
+        let rightWords = extractWords(rightAtom.skeleton)
         let lcs = longestCommonSubsequence(leftWords, rightWords)
 
-        let leftMod = applyWordWrappers(to: leftText, sideWords: leftWords, lcs: lcs, open: "<del class=\"diff-removed\">", close: "</del>")
-        let rightMod = applyWordWrappers(to: rightText, sideWords: rightWords, lcs: lcs, open: "<ins class=\"diff-added\">", close: "</ins>")
+        let leftWrapped = applyWordWrappers(to: leftAtom.skeleton, sideWords: leftWords, lcs: lcs, open: "<del class=\"diff-removed\">", close: "</del>")
+        let rightWrapped = applyWordWrappers(to: rightAtom.skeleton, sideWords: rightWords, lcs: lcs, open: "<ins class=\"diff-added\">", close: "</ins>")
 
-        return (leftMod, rightMod)
+        // For math, we always restore the *original clean* math content of that side
+        // inside the diff span. No automatic injection of \\color/\\cancel into the math source
+        // (that was causing complex formulas like the quadratic to fail to render in KaTeX).
+        // Users can still manually add \\color/\\cancel in their documents for custom annotation;
+        // the clean source + atomization ensures they will render.
+        let leftRestored = restoreMathInWrapped(leftWrapped, using: leftAtom.placeholders)
+        let rightRestored = restoreMathInWrapped(rightWrapped, using: rightAtom.placeholders)
+
+        return (leftRestored, rightRestored)
+    }
+
+    // MARK: - Math-aware diff atomization (prevents breaking KaTeX when formulas differ)
+
+    private struct MathAtomization {
+        /// Text with math expressions replaced by unique placeholders (no whitespace).
+        let skeleton: String
+        /// placeholder -> original math source (including its delimiters)
+        let placeholders: [String: String]
+        /// Ordered list of the full delimited math strings as they appeared in the text (for pairing across sides).
+        let orderedMaths: [String]
+    }
+
+    /// Replace every math region with a single atomic placeholder token.
+    /// This lets the normal word-level LCS treat a whole formula as one "word".
+    /// Code blocks/spans are left alone (per-word diff inside code is usually fine and desired).
+    private func atomizeMath(_ text: String) -> MathAtomization {
+        var skeleton = ""
+        var placeholders: [String: String] = [:]
+        var orderedMaths: [String] = []
+        var phIndex = 0
+        var i = text.startIndex
+
+        func nextPlaceholder() -> String {
+            let p = "\u{0001}M\(phIndex)\u{0001}"
+            phIndex += 1
+            return p
+        }
+
+        func appendMath(_ math: String) {
+            let p = nextPlaceholder()
+            placeholders[p] = math
+            orderedMaths.append(math)
+            skeleton += p
+        }
+
+        while i < text.endIndex {
+            let ch = text[i]
+
+            // --- Fenced code: copy verbatim (do not atomize inside) ---
+            if (ch == "`" || ch == "~") {
+                let atLineStart = i == text.startIndex || text[text.index(before: i)] == "\n"
+                if atLineStart {
+                    let fenceCount = text[i...].prefix(while: { $0 == ch }).count
+                    if fenceCount >= 3 {
+                        let fence = String(repeating: ch, count: fenceCount)
+                        // Find the start of the closing fence line (a \n followed by the fence)
+                        // and copy the entire block as-is.
+                        let searchStart = text.index(i, offsetBy: fenceCount)
+                        if let closing = text[searchStart...].range(of: "\n" + fence) {
+                            // Include from opening up to the end of the closing fence line
+                            var end = text.index(closing.upperBound, offsetBy: fenceCount)
+                            if end < text.endIndex, text[end] == "\n" {
+                                end = text.index(after: end)
+                            } else if end < text.endIndex {
+                                // rare: no \n after closer, take what we have
+                            }
+                            skeleton += text[i..<end]
+                            i = end
+                            continue
+                        } else {
+                            // Unclosed fence: copy the rest
+                            skeleton += text[i...]
+                            i = text.endIndex
+                            continue
+                        }
+                    }
+                }
+            }
+
+            // --- Inline code `...` : copy verbatim ---
+            if ch == "`" {
+                var j = i
+                while j < text.endIndex && text[j] == "`" { j = text.index(after: j) }
+                let ticks = String(text[i..<j])
+                if let close = text.range(of: ticks, range: j..<text.endIndex) {
+                    skeleton += text[i..<close.upperBound]
+                    i = close.upperBound
+                    continue
+                }
+            }
+
+            // --- Display math $$...$$ ---
+            if ch == "$", text[i...].hasPrefix("$$") {
+                let after = text.index(i, offsetBy: 2)
+                if let closeRange = text.range(of: "$$", range: after..<text.endIndex) {
+                    let end = text.index(closeRange.lowerBound, offsetBy: 2)
+                    appendMath(String(text[i..<end]))
+                    i = end
+                    continue
+                }
+            }
+
+            // --- Display \[ ... \] ---
+            if text[i...].hasPrefix("\\[") {
+                let after = text.index(i, offsetBy: 2)
+                if let closeRange = text.range(of: "\\]", range: after..<text.endIndex) {
+                    let end = text.index(closeRange.lowerBound, offsetBy: 2)
+                    appendMath(String(text[i..<end]))
+                    i = end
+                    continue
+                }
+            }
+
+            // --- Inline \( ... \) ---
+            if text[i...].hasPrefix("\\(") {
+                let after = text.index(i, offsetBy: 2)
+                if let closeRange = text.range(of: "\\)", range: after..<text.endIndex) {
+                    let end = text.index(closeRange.lowerBound, offsetBy: 2)
+                    appendMath(String(text[i..<end]))
+                    i = end
+                    continue
+                }
+            }
+
+            // --- Inline $...$ (single line, no leading/trailing space before closer) ---
+            if ch == "$" {
+                let after = text.index(after: i)
+                if after < text.endIndex,
+                   text[after] != "$",
+                   text[after] != " ",
+                   text[after] != "\n" {
+                    var j = after
+                    var found = false
+                    while j < text.endIndex && text[j] != "\n" {
+                        if text[j] == "$", text.index(before: j) >= text.startIndex, text[text.index(before: j)] != " " {
+                            appendMath(String(text[i...j]))
+                            i = text.index(after: j)
+                            found = true
+                            break
+                        }
+                        j = text.index(after: j)
+                    }
+                    if found { continue }
+                }
+            }
+
+            // Normal character
+            skeleton.append(ch)
+            i = text.index(after: i)
+        }
+
+        return MathAtomization(skeleton: skeleton, placeholders: placeholders, orderedMaths: orderedMaths)
+    }
+
+    private func insertColorIntoMath(_ fullMath: String, color: String) -> String {
+        if fullMath.hasPrefix("$$") && fullMath.hasSuffix("$$") && fullMath.count > 4 {
+            let inner = String(fullMath.dropFirst(2).dropLast(2))
+            return "$$\\color{" + color + "}" + inner + "$$"
+        }
+        if fullMath.hasPrefix("$") && fullMath.hasSuffix("$") && fullMath.count > 2 && !fullMath.hasPrefix("$$") {
+            let inner = String(fullMath.dropFirst().dropLast())
+            return "$\\color{" + color + "}" + inner + "$"
+        }
+        if fullMath.hasPrefix("\\[") && fullMath.hasSuffix("\\]") && fullMath.count > 4 {
+            let inner = String(fullMath.dropFirst(2).dropLast(2))
+            return "\\[\\color{" + color + "}" + inner + "\\]"
+        }
+        if fullMath.hasPrefix("\\(") && fullMath.hasSuffix("\\)") && fullMath.count > 4 {
+            let inner = String(fullMath.dropFirst(2).dropLast(2))
+            return "\\(\\color{" + color + "}" + inner + "\\)"
+        }
+        return fullMath
+    }
+
+    /// Given a skeleton that may contain <del class="diff-removed">PH</del> / <ins class="diff-added">PH</ins> (or bare PH),
+    /// replace the placeholders. For math PHs that were changed (wrapped), insert \color{red} or \color{green}
+    /// right after the opening delimiter so the entire formula renders in that color.
+    /// The <span class="diff-xxx"> is kept for scrollbar markers.
+    /// This guarantees clean LaTeX source for KaTeX while still showing the diff via color.
+    private func restoreMathInWrapped(_ wrapped: String, using map: [String: String], annotatedMap: [String: String] = [:]) -> String {
+        var result = wrapped
+        for (ph, original) in map {
+            let escaped = NSRegularExpression.escapedPattern(for: ph)
+
+            let isMath = original.hasPrefix("$") || original.hasPrefix("\\(") || original.hasPrefix("\\[")
+
+            // Changed math on the "removed" (left/older) side -> red
+            let delPattern = "<del([^>]*)>\(escaped)</del>"
+            if let regex = try? NSRegularExpression(pattern: delPattern) {
+                let ns = NSRange(result.startIndex..<result.endIndex, in: result)
+                let toInsert = isMath ? insertColorIntoMath(original, color: "red") : original
+                result = regex.stringByReplacingMatches(in: result, range: ns, withTemplate: "<span class=\"diff-removed\">" + toInsert + "</span>")
+            }
+
+            // Changed math on the "added" (right/newer) side -> green
+            let insPattern = "<ins([^>]*)>\(escaped)</ins>"
+            if let regex = try? NSRegularExpression(pattern: insPattern) {
+                let ns = NSRange(result.startIndex..<result.endIndex, in: result)
+                let toInsert = isMath ? insertColorIntoMath(original, color: "green") : original
+                result = regex.stringByReplacingMatches(in: result, range: ns, withTemplate: "<span class=\"diff-added\">" + toInsert + "</span>")
+            }
+
+            // Bare placeholder (unchanged) - restore clean original
+            if !result.contains(ph) { // already replaced if it was wrapped
+                result = result.replacingOccurrences(of: ph, with: original)
+            }
+        }
+        return result
+    }
+
+    // MARK: - Math diff annotation using LaTeX color/cancel for intra-formula visual diff
+
+    private func splitMathDelimiters(_ full: String) -> (open: String, content: String, close: String)? {
+        if full.hasPrefix("$$") && full.hasSuffix("$$") && full.count > 4 {
+            let content = String(full.dropFirst(2).dropLast(2))
+            return ("$$", content, "$$")
+        }
+        if full.hasPrefix("\\[") && full.hasSuffix("\\]") && full.count > 4 {
+            let content = String(full.dropFirst(2).dropLast(2))
+            return ("\\[", content, "\\]")
+        }
+        if full.hasPrefix("\\(") && full.hasSuffix("\\)") && full.count > 4 {
+            let content = String(full.dropFirst(2).dropLast(2))
+            return ("\\(", content, "\\)")
+        }
+        if full.hasPrefix("$") && full.hasSuffix("$") && full.count > 2 && !full.hasPrefix("$$") {
+            let content = String(full.dropFirst().dropLast())
+            return ("$", content, "$")
+        }
+        return nil
+    }
+
+    /// Given two full delimited math strings (e.g. "$E = Mc^2$" and "$E = mc^2$"),
+    /// compute word-level diff on their content and return versions with LaTeX
+    /// color/cancel annotations for the differing parts, preserving the original delimiters.
+    /// This produces sources like "$E = {\\color{red}\\cancel{M}}c^2$" on the removed side
+    /// and "$E = {\\color{green}{m}}c^2$" on the added side.
+    private func createAnnotatedMathPair(leftFullMath: String, rightFullMath: String) -> (left: String, right: String) {
+        guard let lparts = splitMathDelimiters(leftFullMath),
+              let rparts = splitMathDelimiters(rightFullMath) else {
+            return (leftFullMath, rightFullMath)
+        }
+        let leftContent = lparts.content
+        let rightContent = rparts.content
+
+        let leftWords = extractWords(leftContent)
+        let rightWords = extractWords(rightContent)
+        let lcs = longestCommonSubsequence(leftWords, rightWords)
+
+        // For the "left" side (older/removed changes): use red cancel for removed words
+        let leftAnnContent = applyWordWrappers(
+            to: leftContent,
+            sideWords: leftWords,
+            lcs: lcs,
+            open: "{\\color{red}\\cancel{",
+            close: "}}"
+        )
+        // For the "right" side (newer/added changes): use green for added words
+        let rightAnnContent = applyWordWrappers(
+            to: rightContent,
+            sideWords: rightWords,
+            lcs: lcs,
+            open: "{\\color{green}{",
+            close: "}}"
+        )
+
+        let leftAnn = lparts.open + leftAnnContent + lparts.close
+        let rightAnn = rparts.open + rightAnnContent + rparts.close
+        return (leftAnn, rightAnn)
+    }
+
+    /// Shared helper: given two source texts (already the versions to compare), labels,
+    /// and per-side file types, run the line/word diff annotation, render both sides
+    /// (preserving structure via injected <del>/<ins> in the Markdown source), build
+    /// the comparison HTML, and return it plus a stats string for logging if desired.
+    private func buildComparisonHTML(
+        leftText: String,
+        rightText: String,
+        leftLabel: String,
+        rightLabel: String,
+        leftFileType: MarkdownDocument.FileType,
+        rightFileType: MarkdownDocument.FileType
+    ) -> (html: String, stats: String) {
+        let leftLines = leftText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let rightLines = rightText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let (lAnn, rAnn) = annotatedLines(leftLines: leftLines, rightLines: rightLines)
+
+        let (leftDiffed, rightDiffed) = diffedMarkdownSourcesWordByWord(leftText: leftText, rightText: rightText)
+
+        let leftBody = MarkdownRenderer.render(text: leftDiffed, fileType: leftFileType, allowUnsafeHTML: true)
+        let rightBody = MarkdownRenderer.render(text: rightDiffed, fileType: rightFileType, allowUnsafeHTML: true)
+
+        let removedCount = lAnn.filter { $0.1 }.count
+        let addedCount = rAnn.filter { $0.1 }.count
+        let stats = (removedCount == 0 && addedCount == 0) ? "identical" : "\(removedCount) removed, \(addedCount) added (source lines)"
+
+        let html = HTMLTemplate.buildComparison(
+            leftBody: leftBody,
+            rightBody: rightBody,
+            leftLabel: leftLabel,
+            rightLabel: rightLabel,
+            stats: stats,
+            settings: SettingsStore.shared,
+            zoomFactor: self.zoomFactor
+        )
+        return (html, stats)
     }
 
     private func loadComparisonContent(left: GitVersion, right: GitVersion, showBanner: Bool) async {
@@ -611,32 +1002,16 @@ final class DocumentWindowController: NSWindowController {
                 ? self.markdownDocument.text
                 : try await self.gitClient.content(at: right.sha, for: self.markdownDocument.fileURL)
 
-            // Smart source-line diff: we modify the *source* (preserving block markers like #, -, > etc.
-            // outside the wrapper) then render the whole modified document once per side.
-            // This keeps full Markdown structure (nested lists, TOCs, headings, etc.) while still
-            // highlighting differing source lines in red/green.
-            let leftLines = leftText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-            let rightLines = rightText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-            let (lAnn, rAnn) = annotatedLines(leftLines: leftLines, rightLines: rightLines)
+            let leftLabel = "\(left.shortSha) — \(left.subject)"
+            let rightLabel = right.isWorkingTree ? "Working tree (current on disk)" : "\(right.shortSha) — \(right.subject)"
 
-            let (leftDiffed, rightDiffed) = diffedMarkdownSourcesWordByWord(leftText: leftText, rightText: rightText)
-
-            let leftBody = MarkdownRenderer.render(text: leftDiffed, fileType: self.markdownDocument.fileType, allowUnsafeHTML: true)
-            let rightBody = MarkdownRenderer.render(text: rightDiffed, fileType: self.markdownDocument.fileType, allowUnsafeHTML: true)
-
-            // Stats from our line diff (no git diff).
-            let removedCount = lAnn.filter { $0.1 }.count
-            let addedCount = rAnn.filter { $0.1 }.count
-            let stats = (removedCount == 0 && addedCount == 0) ? "identical" : "\(removedCount) removed, \(addedCount) added (source lines)"
-
-            let html = HTMLTemplate.buildComparison(
-                leftBody: leftBody,
-                rightBody: rightBody,
-                leftLabel: "\(left.shortSha) — \(left.subject)",
-                rightLabel: right.isWorkingTree ? "Working tree (current on disk)" : "\(right.shortSha) — \(right.subject)",
-                stats: stats,
-                settings: SettingsStore.shared,
-                zoomFactor: self.zoomFactor
+            let (html, _) = buildComparisonHTML(
+                leftText: leftText,
+                rightText: rightText,
+                leftLabel: leftLabel,
+                rightLabel: rightLabel,
+                leftFileType: self.markdownDocument.fileType,
+                rightFileType: self.markdownDocument.fileType
             )
 
             await MainActor.run { [weak self] in
@@ -667,14 +1042,142 @@ final class DocumentWindowController: NSWindowController {
         }
     }
 
+    /// File-to-file (non-git) path. Snapshots + the right-hand URL are in hand.
+    /// This is the *entry* path (sets up state + partner watcher + presents the UI).
+    /// Live updates later use the lighter `refreshFileComparison()`.
+    private func loadFileComparisonContent(
+        leftText: String,
+        rightText: String,
+        leftLabel: String,
+        rightLabel: String,
+        baseURL: URL,
+        leftFileType: MarkdownDocument.FileType,
+        rightFileType: MarkdownDocument.FileType,
+        rightURL: URL
+    ) async {
+        let (html, _) = buildComparisonHTML(
+            leftText: leftText,
+            rightText: rightText,
+            leftLabel: leftLabel,
+            rightLabel: rightLabel,
+            leftFileType: leftFileType,
+            rightFileType: rightFileType
+        )
+
+        await MainActor.run { [weak self] in
+            guard let self else { return }
+
+            // Enter file-comparison mode (clears any prior git comparison state).
+            self.comparisonVersions = nil
+            self.fileComparison = FileComparisonState(
+                leftURL: self.markdownDocument.fileURL,
+                rightURL: rightURL,
+                leftLabel: leftLabel,
+                rightLabel: rightLabel,
+                leftFileType: leftFileType,
+                rightFileType: rightFileType
+            )
+
+            // Watch the second file for live updates (if it is not the same as the primary,
+            // which is already watched by the normal fileWatcher).
+            self.comparisonPartnerWatcher = nil
+            if rightURL != self.markdownDocument.fileURL {
+                self.comparisonPartnerWatcher = FileWatcher(url: rightURL) { [weak self] in
+                    self?.refreshFileComparison()
+                }
+            }
+
+            self.window?.title = "\(self.markdownDocument.displayTitle) — compare \(leftLabel) vs \(rightLabel)"
+            self.webViewController?.loadComparisonHTML(html, baseURL: baseURL)
+
+            self.webViewController?.showBanner(
+                "Comparison view (read-only)",
+                style: .info,
+                autoDismiss: false,
+                action: ("Return to document", { [weak self] in self?.exitComparisonView() })
+            )
+
+            self.updateRevisionControls()
+        }
+    }
+
     @objc private func exitComparisonView() {
         comparisonVersions = nil
+        fileComparison = nil
+        comparisonPartnerWatcher = nil
         window?.title = markdownDocument.displayTitle
         webViewController?.exitComparisonView()
         // Restore the single revision selector in the title bar.
         updateRevisionControls()
-        // For the debug "live vs first" case we return to live document.
+        // Return to the normal (live or historical) document view.
         webViewController?.loadDocument()
+    }
+
+    /// Called when either side of an active non-git file comparison changes on disk
+    /// (via the primary's fileWatcher or the comparisonPartnerWatcher).
+    /// Re-reads both current on-disk texts, recomputes the diff annotation + render,
+    /// and reloads the comparison surface while attempting to preserve pane scroll positions.
+    private func refreshFileComparison() {
+        guard let state = fileComparison,
+              let webVC = webViewController else { return }
+
+        webVC.captureComparisonScrolls { [weak self] leftY, rightY in
+            guard let self else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                guard let state = self.fileComparison else { return }
+
+                // Re-read primary (left). On failure keep the model's last text + warn.
+                var leftText = self.markdownDocument.text
+                do {
+                    try self.markdownDocument.reload()
+                    leftText = self.markdownDocument.text
+                } catch {
+                    webVC.showBanner(
+                        "Could not re-read \(self.markdownDocument.displayTitle): \(error.localizedDescription)",
+                        style: .warning, autoDismiss: true
+                    )
+                    // proceed with stale left text
+                }
+
+                // Re-read the second file (right). If this fails we do not replace the
+                // comparison view (user keeps the last good diff + sees a warning).
+                var rightText: String?
+                var rightType = state.rightFileType
+                do {
+                    let rd = try MarkdownDocument(url: state.rightURL)
+                    rightText = rd.text
+                    rightType = rd.fileType
+                } catch {
+                    webVC.showBanner(
+                        "Could not re-read second file for comparison: \(error.localizedDescription)",
+                        style: .warning, autoDismiss: true
+                    )
+                    return
+                }
+
+                guard let rText = rightText else { return }
+
+                let (html, _) = self.buildComparisonHTML(
+                    leftText: leftText,
+                    rightText: rText,
+                    leftLabel: state.leftLabel,
+                    rightLabel: state.rightLabel,
+                    leftFileType: self.markdownDocument.fileType,
+                    rightFileType: rightType
+                )
+
+                let base = state.leftURL.deletingLastPathComponent()
+                self.webViewController?.loadComparisonHTML(html, baseURL: base)
+
+                // The freshly loaded comparison HTML runs its own init (scrollbars + markers)
+                // after DOMContentLoaded. Give it a moment then restore the user's scroll
+                // positions in both panes.
+                DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(140)) { [weak self] in
+                    self?.webViewController?.restoreComparisonScrolls(left: leftY, right: rightY)
+                }
+            }
+        }
     }
 
     // MARK: - Comparison side selection (two titlebar pop-ups)
@@ -779,8 +1282,8 @@ final class DocumentWindowController: NSWindowController {
 
     @MainActor
     private func performHistoryStep(delta: Int, newWindow: Bool) async {
-        if comparisonVersions != nil {
-            // In comparison mode the titlebar has two selectors; ignore arrow/< > steps.
+        if comparisonVersions != nil || fileComparison != nil {
+            // In comparison mode (git or file-to-file) ignore history step keys.
             updateRevisionControls()
             return
         }
@@ -1067,7 +1570,7 @@ final class DocumentWindowController: NSWindowController {
     private func updateRevisionControls() {
         ensureRevisionPopUpButtons()
 
-        let inComparison = comparisonVersions != nil
+        let inComparison = comparisonVersions != nil || fileComparison != nil
 
         // Remove whatever revision accessories are currently installed.
         // We manage them as separate mode-specific accessories rather than trying
@@ -1076,52 +1579,57 @@ final class DocumentWindowController: NSWindowController {
         removeAllRevisionAccessories()
 
         if inComparison {
-            // Comparison mode: only L and R selectors (no single-view one).
-            // Left accessory
-            let leftContainer = NSView(frame: NSRect(x: 0, y: 0, width: 145, height: 22))
-            let llabel = NSTextField(labelWithString: "L")
-            llabel.isEditable = false
-            llabel.isBordered = false
-            llabel.drawsBackground = false
-            llabel.font = NSFont.systemFont(ofSize: 9, weight: .medium)
-            llabel.textColor = .tertiaryLabelColor
-            llabel.frame = NSRect(x: 2, y: 4, width: 10, height: 14)
-            leftContainer.addSubview(llabel)
+            if comparisonVersions != nil {
+                // Git comparison mode: show dual L/R revision selectors.
+                // Left accessory
+                let leftContainer = NSView(frame: NSRect(x: 0, y: 0, width: 145, height: 22))
+                let llabel = NSTextField(labelWithString: "L")
+                llabel.isEditable = false
+                llabel.isBordered = false
+                llabel.drawsBackground = false
+                llabel.font = NSFont.systemFont(ofSize: 9, weight: .medium)
+                llabel.textColor = .tertiaryLabelColor
+                llabel.frame = NSRect(x: 2, y: 4, width: 10, height: 14)
+                leftContainer.addSubview(llabel)
 
-            if let leftBtn = leftRevisionPopUpButton {
-                leftBtn.frame = NSRect(x: 14, y: 0, width: 125, height: 22)
-                leftContainer.addSubview(leftBtn)
+                if let leftBtn = leftRevisionPopUpButton {
+                    leftBtn.frame = NSRect(x: 14, y: 0, width: 125, height: 22)
+                    leftContainer.addSubview(leftBtn)
+                }
+
+                let leftAcc = NSTitlebarAccessoryViewController()
+                leftAcc.view = leftContainer
+                leftAcc.layoutAttribute = .leading
+                window?.addTitlebarAccessoryViewController(leftAcc)
+                leftRevisionAccessory = leftAcc
+
+                // Right accessory
+                let rightContainer = NSView(frame: NSRect(x: 0, y: 0, width: 145, height: 22))
+                let rlabel = NSTextField(labelWithString: "R")
+                rlabel.isEditable = false
+                rlabel.isBordered = false
+                rlabel.drawsBackground = false
+                rlabel.font = NSFont.systemFont(ofSize: 9, weight: .medium)
+                rlabel.textColor = .tertiaryLabelColor
+                rlabel.frame = NSRect(x: 2, y: 4, width: 10, height: 14)
+                rightContainer.addSubview(rlabel)
+
+                if let rightBtn = rightRevisionPopUpButton {
+                    rightBtn.frame = NSRect(x: 14, y: 0, width: 125, height: 22)
+                    rightContainer.addSubview(rightBtn)
+                }
+
+                let rightAcc = NSTitlebarAccessoryViewController()
+                rightAcc.view = rightContainer
+                rightAcc.layoutAttribute = .leading
+                window?.addTitlebarAccessoryViewController(rightAcc)
+                rightRevisionAccessory = rightAcc
+
+                updateComparisonRevisionPopUps()
+            } else {
+                // File-to-file (non-git) comparison: do not install revision popups.
+                // The "Return to document" banner (and repurposed info button) provide exit.
             }
-
-            let leftAcc = NSTitlebarAccessoryViewController()
-            leftAcc.view = leftContainer
-            leftAcc.layoutAttribute = .leading
-            window?.addTitlebarAccessoryViewController(leftAcc)
-            leftRevisionAccessory = leftAcc
-
-            // Right accessory
-            let rightContainer = NSView(frame: NSRect(x: 0, y: 0, width: 145, height: 22))
-            let rlabel = NSTextField(labelWithString: "R")
-            rlabel.isEditable = false
-            rlabel.isBordered = false
-            rlabel.drawsBackground = false
-            rlabel.font = NSFont.systemFont(ofSize: 9, weight: .medium)
-            rlabel.textColor = .tertiaryLabelColor
-            rlabel.frame = NSRect(x: 2, y: 4, width: 10, height: 14)
-            rightContainer.addSubview(rlabel)
-
-            if let rightBtn = rightRevisionPopUpButton {
-                rightBtn.frame = NSRect(x: 14, y: 0, width: 125, height: 22)
-                rightContainer.addSubview(rightBtn)
-            }
-
-            let rightAcc = NSTitlebarAccessoryViewController()
-            rightAcc.view = rightContainer
-            rightAcc.layoutAttribute = .leading
-            window?.addTitlebarAccessoryViewController(rightAcc)
-            rightRevisionAccessory = rightAcc
-
-            updateComparisonRevisionPopUps()
             updateInfoButtonForCurrentMode()
 
         } else {
@@ -1157,7 +1665,7 @@ final class DocumentWindowController: NSWindowController {
 
     private func updateInfoButtonForCurrentMode() {
         guard let btn = infoButton else { return }
-        if comparisonVersions != nil {
+        if comparisonVersions != nil || fileComparison != nil {
             btn.image = NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: "Exit comparison")!
             btn.toolTip = "Return to single document view"
             btn.action = #selector(exitComparisonView)
@@ -1234,8 +1742,8 @@ final class DocumentWindowController: NSWindowController {
     }
 
     @objc private func revisionPopUpAction(_ sender: NSPopUpButton) {
-        if comparisonVersions != nil {
-            // Stale single popup while in comparison — force dual selectors back.
+        if comparisonVersions != nil || fileComparison != nil {
+            // Stale single popup while in comparison — force correct controls.
             updateRevisionControls()
             return
         }
@@ -1245,7 +1753,7 @@ final class DocumentWindowController: NSWindowController {
     }
 
     private func jumpToHistoryIndex(_ index: Int) {
-        if comparisonVersions != nil {
+        if comparisonVersions != nil || fileComparison != nil {
             updateRevisionControls()
             return
         }
@@ -1303,9 +1811,18 @@ final class DocumentWindowController: NSWindowController {
     private func handleFileChange() {
         guard let webVC = webViewController else { return }
 
-        if isViewingHistory {
+        if fileComparison != nil {
+            // While showing a live file-to-file diff, a change on the *primary* side
+            // should refresh the comparison (diff recomputed) instead of doing a
+            // normal single-document reload.
+            refreshFileComparison()
+            return
+        }
+
+        if isViewingHistory || comparisonVersions != nil {
             // Ignore live file changes while the user is inspecting a historical
-            // git revision. The "Return to current" action will pick up reality.
+            // git revision or a git-based comparison. The "Return to ..." actions
+            // will pick up reality.
             return
         }
 

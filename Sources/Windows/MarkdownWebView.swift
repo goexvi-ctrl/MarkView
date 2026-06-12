@@ -338,6 +338,46 @@ final class MarkdownWebViewController: NSViewController {
         webView.evaluateJavaScript("restoreScroll(\(y))", completionHandler: nil)
     }
 
+    // MARK: - Comparison (file-to-file) live scroll capture/restore
+    // The comparison HTML uses two independent overflow:auto panes (#left-pane, #right-pane)
+    // rather than the normal document scroll. These helpers talk directly to them.
+
+    func captureComparisonScrolls(completion: @escaping @MainActor (Double, Double) -> Void) {
+        let js = """
+        (function(){
+          const l = document.getElementById('left-pane');
+          const r = document.getElementById('right-pane');
+          return {left: l ? l.scrollTop : 0, right: r ? r.scrollTop : 0};
+        })();
+        """
+        webView.evaluateJavaScript(js) { result, _ in
+            var ly: Double = 0
+            var ry: Double = 0
+            if let d = result as? [String: NSNumber] {
+                ly = d["left"]?.doubleValue ?? 0
+                ry = d["right"]?.doubleValue ?? 0
+            } else if let d = result as? [String: Double] {
+                ly = d["left"] ?? 0
+                ry = d["right"] ?? 0
+            }
+            Task { @MainActor in completion(ly, ry) }
+        }
+    }
+
+    func restoreComparisonScrolls(left: Double, right: Double) {
+        // Setting scrollTop will fire the 'scroll' listeners the comparison template
+        // installs for its custom scrollbar thumbs, so they should track.
+        let js = """
+        (function(){
+          const lp = document.getElementById('left-pane');
+          const rp = document.getElementById('right-pane');
+          if (lp) lp.scrollTop = \(left);
+          if (rp) rp.scrollTop = \(right);
+        })();
+        """
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
     func applySettings(_ settings: SettingsStore) {
         let json = settings.cssVariablesJSON()
         webView.evaluateJavaScript("applySettings(\(json))", completionHandler: nil)

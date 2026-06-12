@@ -276,6 +276,24 @@ phasing (A then B then C), and constraints from Design.md.
 - [NEW] H3.2 Collapse large unchanged context hunks; finer intra-hunk word
   highlights (optional); loading states, accessibility, perf caps, empty states.
 
+- [CODED] H4.1 Non-git "compare against another file": from any open document window
+  (live or historical), invoke "Compare with File..." (Cmd-Shift-D or menu). Picks a
+  second .md/.markdown/.txt via NSOpenPanel, snapshots both on-disk texts (no git
+  involvement whatsoever), re-uses the existing pure-Swift line/word diff annotation
+  + MarkdownRenderer (per-side FileType) + HTMLTemplate.buildComparison + synthetic
+  load path. Enters the same side-by-side surface with filename labels; title and
+  banner indicate the pair. File-comparison mode intentionally omits the dual git
+  revision popups (return via banner action or titlebar ⓘ button which becomes an X).
+  Git history compare continues to work unchanged alongside this.
+  Live update (H4.1 follow-up): while a file-to-file comparison is shown, the primary
+  document's FileWatcher plus a dedicated partner FileWatcher on the second file
+  cause an automatic refresh on change to *either* file. The latest on-disk text for
+  both sides is re-read, the diff (line + word) is recomputed, the comparison HTML
+  is rebuilt and reloaded, and scroll positions in the two panes are captured before
+  the reload and restored afterward (via new capture/restoreComparisonScrolls helpers
+  that target the #left-pane / #right-pane elements). Normal live-reload and git
+  comparison/history modes continue to ignore disk changes as before.
+
 ---
 
 ## Cross-cutting / Definition of Done

@@ -1,6 +1,6 @@
-# Markdown Features Showcase
+# Markdown Diff Showcase
 
-This document demonstrates the various Markdown features supported by MarkView, based on GitHub Flavored Markdown (GFM) with additional extensions like math via KaTeX.
+This document demonstrates the various Markdown features supported by MarkView and how diffs are shown, based on GitHub Flavored Markdown (GFM) with some extensions like math via KaTeX.
 
 ## Headings
 
@@ -12,19 +12,19 @@ This document demonstrates the various Markdown features supported by MarkView, 
 
 ### Heading Level 3
 
-#### Heading Level 4
+#### Heading **Level** 4
 
-##### Heading Level 5
+##### Heading ~~Level~~ 5
 
-###### Heading Level 6
+###### Heading *Level 6*
 
 ### Example 2: Additional Headings with Emphasis
 
 # Main Document Title
 
-## Section with **Bold**
+## Section with *Italic*
 
-### Subsection with *Italic*
+### **Subsection** with *Italic*
 
 ## Paragraphs
 
@@ -32,7 +32,7 @@ This document demonstrates the various Markdown features supported by MarkView, 
 
 This is a standard paragraph. It contains multiple sentences to show natural text flow and wrapping.
 
-Paragraphs in Markdown are created by separating blocks of text with one or more blank lines. Inline formatting like **bold** can be included.
+Paragraphs in Markdown are created by having blocks of text separated with one or more blank lines. Inline formatting like **bold** can be included.
 
 ### Example 2: Paragraphs with Mixed Content
 
@@ -82,6 +82,7 @@ Functions like `calculateTotal(price, tax)` or constants such as `MAX_VALUE = 10
 
 ```python
 def fibonacci(n):
+    // the end
     if n <= 1:
         return n
     return fibonacci(n-1) + fibonacci(n-2)
@@ -93,11 +94,11 @@ print(fibonacci(10))
 
 ```swift
 // A simple function to greet users
-func greet(name: String) -> String {
-    return "Hello, \(name)!"
+func greet(world: String) -> String {
+    return "Hello, \(world)!"
 }
 
-let message = greet(name: "World")
+let message = greet(world: "World")
 print(message)
 ```
 
@@ -105,19 +106,21 @@ print(message)
 
 ### Example 1: Basic Unordered List
 
-- First item in the list
+- First entry in the list
+  - Nested in the first item
 - Second item
   - Nested sub-item under second
   - Another nested item
 - Third item
+- Fourth item
 
 ### Example 2: Alternative Unordered List Markers
 
-* Item using asterisk
-* Another asterisk item
-  * Nested with asterisk
-+ Item using plus sign
-+ Another plus item
++ Item using asterisk
++ Another asterisk item
+  + Nested with asterisk
+* Item using plus sign
+* Another plus item
 
 ## Ordered Lists
 
@@ -125,8 +128,8 @@ print(message)
 
 1. First step in the process
 2. Second step
-   1. Sub-step under second
-   2. Another sub-step
+   1. Another sub-step
+   2. Sub-step under second
 3. Final step
 
 ### Example 2: Ordered List with Custom Start
@@ -140,47 +143,47 @@ print(message)
 
 ### Example 1: Simple Task List
 
-- [x] Completed task one
-- [ ] Pending task two
-- [x] Another completed task
+- [ ] Completed task one
+- [x] Pending task two
+- [ ] Another completed task
 - [ ] Final pending item
 
 ### Example 2: Task List with Nesting
 
 - [x] Main task completed
-  - [x] Subtask one done
-  - [ ] Subtask two pending
-- [ ] Another main task
+  - [ ] Subtask one done
+  - [x] Subtask two pending
+- [x] Another main task
 
 ## Blockquotes
 
 ### Example 1: Simple Blockquote
 
-> This is a simple blockquote.
+> This is a blockquote.
 > It can contain multiple lines of quoted text.
 
 ### Example 2: Nested Blockquotes
 
-> This is the outer quote.
+> This is an outer quote.
 >
-> > This is a nested inner quote.
+> > This is a nested quote.
 > > It demonstrates deeper quoting levels.
 
 ## Links
 
 ### Example 1: Inline and Reference Links
 
-This is an [inline link](https://example.com "Example Site").
+This is an [a link](https://example.com "Example Site").
 
-See the [reference link][ref1] for more info.
+See the [reference link][ref2] for more info.
 
-[ref1]: https://example.org "Reference Title"
+[ref2]: https://example.org "Reference Title"
 
 ### Example 2: Autolinks and Email
 
-Visit https://github.com for the project.
+Visit https://www.github.com for the project.
 
-Contact us at <support@example.com> for help.
+Contact us at <support@erewhon.com> for help.
 
 ## Images
 
@@ -217,35 +220,36 @@ More content below.
 | Feature     | Description          | Status  |
 |-------------|----------------------|---------|
 | Headings    | Various levels       | Done    |
-| Lists       | Ordered and unordered| Done    |
+| Lists       | Ordered / unordered  | Done    |
+| Underline   | Underlining          | Done    |
 | Emphasis    | Bold and italic      | Done    |
 
 ### Example 2: Table with Alignment
 
-| Left Align | Center Align | Right Align |
-|:-----------|:------------:|------------:|
-| Text one   |    Text two   |    Text three |
-| More left  |   More center |    More right |
+| Left Align | Center Align | Right Align | No Align |
+|:-----------|:------------:|------------:|----------|
+| Text one   |    Text two   |    Text three | four  |
+| More left  |   More center |    More right | more  |
 
 ## Math Equations
 
 ### Example 1: Inline Math
 
-The famous equation is $E = mc^2$, and the quadratic formula is $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$.
+The famous equation is $E = Mc^2$, and the quadratic formula is $x = \frac{-B \pm \sqrt{B^2 - 4ac}}{2A}$.
 
 ### Example 2: Display Math
 
 Here is a summation:
 
 $$
-\sum_{i=1}^{n} i = \frac{n(n+1)}{2}
+\sum_{i=1}^{n} i = \sum_{n(n+1)}{2}
 $$
 
 And a matrix example:
 
 $$
 \begin{pmatrix}
-a & b \\
+A & b \\
 c & d
 \end{pmatrix}
 $$
@@ -254,9 +258,9 @@ $$
 
 ### Example 1: Basic Footnote
 
-This sentence has a footnote reference.[^footnote1]
+This phrase has a footnote reference.[^footnote1]
 
-[^footnote1]: This is the content of the first footnote. It can be quite detailed.
+[^footnote1]: This is the first footnote. It can be quite detailed.
 
 ### Example 2: Multiple Footnotes
 

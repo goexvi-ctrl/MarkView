@@ -410,20 +410,16 @@ Changed version: summation variable renamed from i to k, upper limit changed fro
 Here is a summation:
 
 $$
-
 \sum_{k=1}^{m} k = \frac{m(m+1)}{2}
-
 $$
 
 And a matrix example:
 
 $$
-
 \begin{pmatrix}
 a & x \\
 c & d
 \end{pmatrix}
-
 $$
 
 ### Footnotes - Test

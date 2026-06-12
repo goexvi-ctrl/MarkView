@@ -207,6 +207,35 @@ enum HTMLTemplate {
           /* Basic block-level hinting for H2.2 (refined in H2.3) */
           .compare-pane .older-hint { background: #ffebe9; }
           .compare-pane .newer-hint { background: #dafbe1; }
+
+          /* Visual diff highlighting for math formulas (and text).
+             For any math formula that differs at all between the two sides, we wrap the
+             *entire clean* formula (the actual content from that version) in a <span class="diff-removed">
+             or <span class="diff-added">. This gives a whole-formula red tint on the left/older side
+             and green tint on the right/newer side, without ever putting HTML or extra LaTeX
+             commands inside the math delimiters (so KaTeX always renders the real content cleanly).
+             No strikethrough or underline is applied to the math itself. */
+          .diff-removed {
+            background: #ffcccc !important;
+            padding: 1px 3px;
+            border-radius: 3px;
+            /* no strikethrough on math areas */
+            text-decoration: none !important;
+          }
+          .diff-added {
+            background: #ccffcc !important;
+            padding: 1px 3px;
+            border-radius: 3px;
+            text-decoration: none !important;
+          }
+          /* Ensure the background tint shows through the KaTeX rendering */
+          .diff-removed .katex,
+          .diff-added .katex,
+          .diff-removed .katex * ,
+          .diff-added .katex * {
+            background: inherit !important;
+            text-decoration: none !important;
+          }
         </style>
         <!-- Strong override after theme.css so comparison always uses full window width
              (no "page" max-width cap, and no auto side margins). This also ensures
@@ -357,11 +386,134 @@ enum HTMLTemplate {
             initCustomScrollbar('left-pane', 'left-track', 'left-thumb', true);
             initCustomScrollbar('right-pane', 'right-track', 'right-thumb', false);
 
-            // Place markers after everything (including mermaid/katex/highlight) has rendered
+            // Rich content post-processing for the comparison panes.
+            // The comparison document loads the vendor scripts (highlight / katex+auto-render / mermaid)
+            // but does not load app.js, so we must explicitly drive the same pipeline here
+            // (math, diagrams, syntax highlighting) before the diff markers are placed.
+            (function processRichContent() {
+              // 1. Mermaid: convert fenced mermaid code blocks inside the panes to renderable divs.
+              //    We do a lightweight version of the app.js mermaid handling.
+              if (typeof mermaid !== 'undefined' && mermaid) {
+                try {
+                  // Initialize (safe to call multiple times in modern mermaid).
+                  if (typeof mermaid.initialize === 'function') {
+                    mermaid.initialize({ startOnLoad: false, securityLevel: 'loose' });
+                  }
+                  // Find candidates in both panes (the bodies contain the cmark output).
+                  const panes = [document.getElementById('left-pane'), document.getElementById('right-pane')];
+                  panes.forEach(function(pane) {
+                    if (!pane) return;
+                    const codes = pane.querySelectorAll('pre code');
+                    codes.forEach(function(code) {
+                      const cls = code.className || '';
+                      const text = (code.textContent || '').trim();
+                      const isMermaid = cls.indexOf('language-mermaid') !== -1 || /^graph |^sequenceDiagram|^classDiagram|^stateDiagram|^erDiagram|^flowchart |^gantt |^pie |^journey |^gitGraph |^mindmap |^quadrantChart /i.test(text);
+                      if (!isMermaid) return;
+                      const pre = code.parentElement;
+                      if (!pre || pre.tagName !== 'PRE') return;
+                      const div = document.createElement('div');
+                      div.className = 'mermaid';
+                      div.textContent = text;  // let mermaid read the source
+                      // Preserve a data attribute so re-themes (if ever added) could work.
+                      div.setAttribute('data-mermaid-source', text);
+                      pre.parentNode.replaceChild(div, pre);
+                    });
+                  });
+                  // Render all .mermaid divs we just created.
+                  if (typeof mermaid.run === 'function') {
+                    mermaid.run();
+                  } else if (typeof mermaid.init === 'function') {
+                    mermaid.init(undefined, document.querySelectorAll('.mermaid'));
+                  }
+                } catch (e) {
+                  // Non-fatal; diagrams will just show their source.
+                }
+              }
+
+              // 2. Syntax highlighting (after mermaid conversion so we don't highlight mermaid source).
+              if (typeof hljs !== 'undefined' && hljs && typeof hljs.highlightElement === 'function') {
+                try {
+                  const codes = document.querySelectorAll('#left-pane pre code, #right-pane pre code');
+                  codes.forEach(function(block) {
+                    const cls = block.className || '';
+                    if (cls.indexOf('language-mermaid') !== -1) return;
+                    // If it already looks highlighted, skip.
+                    if (block.className.indexOf('hljs') === -1) {
+                      hljs.highlightElement(block);
+                    }
+                  });
+                } catch (e) {}
+              }
+
+              // 3. KaTeX math (the main thing reported as broken in diff mode).
+              //    Must run after the bodies are in the DOM and after mermaid (so ignoredClasses works).
+              //    We use a more permissive config here (trust + macros) so that annotation
+              //    commands commonly used to highlight changes inside formulas work:
+              //      $E = {\\color{red}M}c^2$
+              //      $E = {\\color{red}\\cancel{M}}c^2$
+              //    The atomization in the Swift diff code ensures that even when only part
+              //    of a formula differs, the LaTeX source fed to KaTeX stays clean.
+
+              // Debug: log the exact math formulas (as they appear in the DOM text nodes / .math-display)
+              // *before* we call renderMathInElement. This lets us see whether \\color, \\cancel etc.
+              // survived the diff source rewriting and the Swift math protection pass.
+              console.log('=== [MarkView Diff Debug] Math source reaching KaTeX (before render) ===');
+              const debugPanes = [
+                { el: document.getElementById('left-pane'), side: 'LEFT (older)' },
+                { el: document.getElementById('right-pane'), side: 'RIGHT (newer)' }
+              ];
+              debugPanes.forEach(function(p) {
+                if (!p.el) return;
+                // Display math (protected by Swift into .math-display divs)
+                p.el.querySelectorAll('.math-display').forEach(function(div) {
+                  const src = (div.textContent || div.innerText || '').trim();
+                  if (src) console.log(p.side + ' [DISPLAY]: ' + src);
+                });
+                // Inline math: walk text nodes for anything that still has $ \\( \\[ after cmark
+                const walker = document.createTreeWalker(p.el, NodeFilter.SHOW_TEXT);
+                let n;
+                while ((n = walker.nextNode())) {
+                  const t = n.textContent || '';
+                  if (t.indexOf('$') !== -1 || t.indexOf('\\\\(') !== -1 || t.indexOf('\\\\[') !== -1) {
+                    // Log the raw text chunk (may contain surrounding text + the $math$)
+                    const short = t.length > 300 ? t.substring(0, 300) + '...' : t;
+                    console.log(p.side + ' [inline-ish]: ' + short);
+                  }
+                }
+              });
+              console.log('=== end math debug log ===');
+
+              if (typeof renderMathInElement === 'function') {
+                try {
+                  renderMathInElement(document.body, {
+                    delimiters: [
+                      { left: '$$',  right: '$$',  display: true  },
+                      { left: '\\[', right: '\\]', display: true  },
+                      { left: '$',   right: '$',   display: false },
+                      { left: '\\(', right: '\\)', display: false },
+                    ],
+                    ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'option'],
+                    ignoredClasses: ['mermaid'],
+                    throwOnError: false,
+                    trust: true,
+                    macros: {
+                      // Approximate cancel package using enclose (supported in KaTeX with trust)
+                      "\\cancel": "\\enclose{horizontalstrike}{#1}",
+                      "\\bcancel": "\\enclose{updiagonalstrike}{#1}",
+                      "\\xcancel": "\\enclose{updiagonalstrike horizontalstrike}{#1}",
+                      "\\cancelto": "\\enclose{horizontalstrike}{#1 \\rightarrow}" // simplified
+                    }
+                  });
+                } catch (e) {}
+              }
+            })();
+
+            // Place markers after everything (including mermaid/katex/highlight) has rendered.
+            // The rich content above may change heights, so markers are intentionally after.
             setTimeout(function() {
               placeDiffMarkers('left-pane', 'left-track', true);
               placeDiffMarkers('right-pane', 'right-track', false);
-            }, 150);
+            }, 180);
 
             // Re-place on resize in case layout changes heights
             window.addEventListener('resize', function() {
