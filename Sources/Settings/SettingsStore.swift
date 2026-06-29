@@ -42,6 +42,12 @@ final class SettingsStore: ObservableObject {
     @Published var maxRecentDocuments: Int {
         didSet { ud.set(maxRecentDocuments, forKey: "maxRecentDocuments") }
     }
+    /// Show the persistent blue "Comparison view (read-only)" banner while in a
+    /// side-by-side diff. Off by default; the two panes + titlebar "x" already make
+    /// the mode (and how to leave it) obvious.
+    @Published var showComparisonBanner: Bool {
+        didSet { ud.set(showComparisonBanner, forKey: "showComparisonBanner") }
+    }
 
     private init() {
         bodyFont           = ud.string(forKey: "bodyFont") ?? ""
@@ -53,6 +59,7 @@ final class SettingsStore: ObservableObject {
         allowUnsafeHTML    = ud.bool(forKey: "allowUnsafeHTML")
         let storedRecent   = ud.integer(forKey: "maxRecentDocuments")
         maxRecentDocuments = storedRecent > 0 ? storedRecent : 20
+        showComparisonBanner = ud.bool(forKey: "showComparisonBanner")  // defaults to false
     }
 
     // JSON for applySettings() bridge call

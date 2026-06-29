@@ -36,6 +36,7 @@ final class DocumentWindowRegistry {
         windows[key] = controller
         controller.showWindow(nil)
         RecentDocumentsStore.shared.add(url)
+        postSessionChanged()
 
         NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
@@ -47,12 +48,30 @@ final class DocumentWindowRegistry {
             Task { @MainActor in
                 guard let self, let controller else { return }
                 self.windows.removeValue(forKey: controller.markdownDocument.key)
+                self.postSessionChanged()
             }
         }
     }
 
+    /// Notify that the open-window set (or a window's diff state) changed so the
+    /// session is re-saved. See AppDelegate's `.markViewSessionDidChange` observer.
+    func postSessionChanged() {
+        NotificationCenter.default.post(name: .markViewSessionDidChange, object: nil)
+    }
+
     func openDocumentURLs() -> [URL] {
         windows.values.map(\.markdownDocument.fileURL)
+    }
+
+    /// Per-window session state: each live window's primary document URL plus, when
+    /// it is showing a file-to-file diff, the URL of the file it is compared against.
+    func sessionDocuments() -> [(url: URL, compareWith: URL?)] {
+        windows.values.map { ($0.markdownDocument.fileURL, $0.fileComparisonPartnerURL) }
+    }
+
+    /// The live window controller currently showing `url`, if any.
+    func controller(for url: URL) -> DocumentWindowController? {
+        windows[DocumentKey(url: url)]
     }
 
     func focusedController() -> DocumentWindowController? {
@@ -79,6 +98,7 @@ final class DocumentWindowRegistry {
 
         // Adopt this controller as the live one.
         windows[key] = controller
+        postSessionChanged()
 
         NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
@@ -90,6 +110,7 @@ final class DocumentWindowRegistry {
             Task { @MainActor in
                 guard let self, let controller else { return }
                 self.windows.removeValue(forKey: controller.markdownDocument.key)
+                self.postSessionChanged()
             }
         }
 

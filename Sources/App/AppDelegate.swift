@@ -1,6 +1,12 @@
 import AppKit
 import UniformTypeIdentifiers
 
+extension Notification.Name {
+    /// Posted whenever the set of open windows or their diff state changes, so the
+    /// session is re-saved incrementally (not just at quit).
+    static let markViewSessionDidChange = Notification.Name("MarkViewSessionDidChange")
+}
+
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
@@ -8,9 +14,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Prevents the startup open panel from appearing.
     private var documentOpened = false
 
-    private let sessionKey = "LastSessionDocuments"
+    private let sessionKey = "LastSessionDocuments"      // legacy: [String] of URLs
+    private let sessionKeyV2 = "LastSessionDocumentsV2"  // [[String:String]] with "url" and optional "compareWith"
+
+    // While restoring, suppress incremental saves so a crash mid-restore can't
+    // truncate the saved session to the windows reopened so far.
+    private var isRestoringSession = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Re-save the session whenever windows open/close or toggle diff mode, so the
+        // on-disk state survives a crash (not just a clean quit).
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(sessionStateDidChange),
+            name: .markViewSessionDidChange,
+            object: nil
+        )
+
         // 1. Files passed on the command line (e.g. `./MarkView some.md` or `open -a MarkView --args some.md`).
         //    Only treat non-option args as files if they actually exist. This prevents stray tokens
         //    (build scripts, shell noise, "YES"/"NO", Xcode scheme args, etc.) from producing scary
@@ -64,23 +84,71 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Session persistence
 
+    @objc private func sessionStateDidChange() {
+        guard !isRestoringSession else { return }
+        saveSession()
+    }
+
     private func saveSession() {
-        let urls = DocumentWindowRegistry.shared.openDocumentURLs()
-        UserDefaults.standard.set(urls.map(\.absoluteString), forKey: sessionKey)
+        // Persist each window's primary URL plus, for file-to-file diffs, the URL it
+        // is compared against so the diff view can be rebuilt on next launch.
+        let encoded: [[String: String]] = DocumentWindowRegistry.shared.sessionDocuments().map { entry in
+            var dict = ["url": entry.url.absoluteString]
+            if let partner = entry.compareWith {
+                dict["compareWith"] = partner.absoluteString
+            }
+            return dict
+        }
+        UserDefaults.standard.set(encoded, forKey: sessionKeyV2)
+        UserDefaults.standard.removeObject(forKey: sessionKey)  // retire the legacy format
     }
 
     // Returns true if at least one previously-open file was successfully reopened.
     private func restoreSession() -> Bool {
-        guard let saved = UserDefaults.standard.stringArray(forKey: sessionKey),
-              !saved.isEmpty else { return false }
+        let entries = savedSessionEntries()
+        guard !entries.isEmpty else { return false }
+
+        // Suppress incremental saves while we reopen windows so a partial restore
+        // can't overwrite the saved session. Re-enabled before returning; the diff
+        // rebuild (compareWith) runs async and will persist the full state then.
+        isRestoringSession = true
+        defer { isRestoringSession = false }
+
         var opened = false
-        for raw in saved {
-            guard let url = URL(string: raw),
-                  FileManager.default.fileExists(atPath: url.path) else { continue }
-            DocumentWindowRegistry.shared.openDocument(url: url)
+        for entry in entries {
+            guard FileManager.default.fileExists(atPath: entry.url.path) else { continue }
+            DocumentWindowRegistry.shared.openDocument(url: entry.url)
             opened = true
+
+            // Rebuild a file-to-file diff if the window had one (and the other file
+            // still exists). Missing the partner just leaves the single document open.
+            if let partner = entry.compareWith,
+               FileManager.default.fileExists(atPath: partner.path),
+               let controller = DocumentWindowRegistry.shared.controller(for: entry.url) {
+                controller.compareWith(fileURL: partner)
+            }
         }
         return opened
+    }
+
+    /// Reads the saved session, preferring the richer V2 format and falling back to
+    /// the legacy plain-URL list written by older builds.
+    private func savedSessionEntries() -> [(url: URL, compareWith: URL?)] {
+        var result: [(url: URL, compareWith: URL?)] = []
+        if let v2 = UserDefaults.standard.array(forKey: sessionKeyV2) as? [[String: String]] {
+            for dict in v2 {
+                guard let raw = dict["url"], let url = URL(string: raw) else { continue }
+                let partner: URL? = dict["compareWith"].flatMap { URL(string: $0) }
+                result.append((url: url, compareWith: partner))
+            }
+            return result
+        }
+        if let legacy = UserDefaults.standard.stringArray(forKey: sessionKey) {
+            for raw in legacy where URL(string: raw) != nil {
+                result.append((url: URL(string: raw)!, compareWith: nil))
+            }
+        }
+        return result
     }
 
     // MARK: - Panels / actions

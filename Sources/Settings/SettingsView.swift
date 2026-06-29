@@ -26,6 +26,8 @@ struct SettingsView: View {
                             Text(theme.rawValue.capitalized).tag(theme)
                         }
                     }
+                    Toggle("Show comparison view banner", isOn: $settings.showComparisonBanner)
+                        .help("Show the blue \"Comparison view (read-only)\" banner while diffing two files. The titlebar \"x\" exits the diff either way.")
                 }
 
                 Section("History") {

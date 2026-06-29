@@ -452,6 +452,18 @@ final class DocumentWindowController: NSWindowController {
         performComparisonAgainstFile(secondURL)
     }
 
+    /// Start a file-to-file comparison against a specific URL without prompting.
+    /// Used by session restore to rebuild a diff view that was open at quit.
+    func compareWith(fileURL: URL) {
+        performComparisonAgainstFile(fileURL)
+    }
+
+    /// The "other" file when this window is showing a file-to-file (non-git) diff,
+    /// else nil. Used to persist/restore the diff across launches.
+    var fileComparisonPartnerURL: URL? {
+        fileComparison?.rightURL
+    }
+
     private func performComparisonAgainstFile(_ secondURL: URL) {
         Task { [weak self] in
             guard let self else { return }
@@ -599,7 +611,7 @@ final class DocumentWindowController: NSWindowController {
                 self.window?.title = "\(self.markdownDocument.displayTitle) — compare \(left.shortSha) vs \(right.shortSha)"
                 self.webViewController?.loadComparisonHTML(html, baseURL: self.markdownDocument.fileURL.deletingLastPathComponent())
 
-                if showBanner {
+                if showBanner && SettingsStore.shared.showComparisonBanner {
                     self.webViewController?.showBanner(
                         "Comparison view (read-only)",
                         style: .info,
@@ -669,14 +681,19 @@ final class DocumentWindowController: NSWindowController {
             self.window?.title = "\(self.markdownDocument.displayTitle) — compare \(leftLabel) vs \(rightLabel)"
             self.webViewController?.loadComparisonHTML(html, baseURL: baseURL)
 
-            self.webViewController?.showBanner(
-                "Comparison view (read-only)",
-                style: .info,
-                autoDismiss: false,
-                action: ("Return to document", { [weak self] in self?.exitComparisonView() })
-            )
+            if SettingsStore.shared.showComparisonBanner {
+                self.webViewController?.showBanner(
+                    "Comparison view (read-only)",
+                    style: .info,
+                    autoDismiss: false,
+                    action: ("Return to document", { [weak self] in self?.exitComparisonView() })
+                )
+            }
 
             self.updateRevisionControls()
+
+            // Entered file-to-file diff mode; persist so it is restored next launch.
+            DocumentWindowRegistry.shared.postSessionChanged()
         }
     }
 
@@ -690,6 +707,8 @@ final class DocumentWindowController: NSWindowController {
         updateRevisionControls()
         // Return to the normal (live or historical) document view.
         webViewController?.loadDocument()
+        // Left diff mode; persist so the window is restored as single next launch.
+        DocumentWindowRegistry.shared.postSessionChanged()
     }
 
     /// Called when either side of an active non-git file comparison changes on disk
