@@ -242,14 +242,14 @@ The famous equation is $E = mc^2$, and the quadratic formula is $x = \frac{-B \p
 Here is a summation:
 
 $$
-\sum_{i=1}^{n} i = \sum_{n(n+1)}{2}
+\sum_{i=1}^{n} i = \sum_{n(n+1)}{3}
 $$
 
 And a matrix example:
 
 $$
 \begin{pmatrix}
-A & b \\
+a & b \\
 c & d
 \end{pmatrix}
 $$
@@ -264,8 +264,8 @@ This phrase has a footnote reference.[^footnote1]
 
 ### Example 2: Multiple Footnotes
 
-Another reference here[^footnote2] and also here[^footnote3].
+Another reference here[^footnote2] and here[^footnote3].
 
 [^footnote2]: Second footnote with some explanation.
 
-[^footnote3]: Third footnote for additional information.
+[^footnote3]: Third FootNote for additional information.
