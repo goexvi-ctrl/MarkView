@@ -116,6 +116,11 @@ final class MarkdownWebViewController: NSViewController {
         // M3: asset:// custom scheme handler for bundled JS/CSS
         config.setURLSchemeHandler(AssetSchemeHandler(), forURLScheme: "asset")
 
+        // mvimg:// custom scheme handler for document-relative local images.
+        // (loadHTMLString gives no filesystem read access, so plain file://
+        // image paths don't load; rewriteLocalImageSources routes them here.)
+        config.setURLSchemeHandler(LocalImageSchemeHandler(), forURLScheme: "mvimg")
+
         // Bridge
         config.userContentController.add(coordinator, name: "bridge")
 
@@ -151,6 +156,66 @@ final class MarkdownWebViewController: NSViewController {
             try? frag.write(toFile: path, atomically: true, encoding: .utf8)
             NSLog("[MarkView] DEBUG: wrote BODY FRAGMENT from renderer → %@", path)
         }
+    }
+
+    // MARK: - Local image rewriting
+
+    /// Rewrites document-relative (and absolute-path / file://) `<img src>` values
+    /// to the `mvimg://` custom scheme so they are served off disk by
+    /// LocalImageSchemeHandler. Network (http/https), data:, and asset:// sources
+    /// are left untouched. `baseDir` is the directory containing the document.
+    nonisolated static func rewriteLocalImageSources(in body: String, baseDir: URL) -> String {
+        // The body is post-sanitize, so img src values are always double-quoted.
+        let pattern = "(<img\\b[^>]*?\\ssrc=\")([^\"]*)(\")"
+        guard let re = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
+            return body
+        }
+
+        let ns = body as NSString
+        var output = ""
+        var lastEnd = 0
+        for m in re.matches(in: body, range: NSRange(location: 0, length: ns.length)) {
+            output += ns.substring(with: NSRange(location: lastEnd, length: m.range.location - lastEnd))
+            lastEnd = m.range.location + m.range.length
+
+            let prefix = ns.substring(with: m.range(at: 1))
+            let src    = ns.substring(with: m.range(at: 2))
+            let suffix = ns.substring(with: m.range(at: 3))
+
+            let newSrc = localImageSrc(src, baseDir: baseDir) ?? src
+            output += prefix + newSrc + suffix
+        }
+        output += ns.substring(from: lastEnd)
+        return output
+    }
+
+    /// Maps a single `src` to an `mvimg://` URL when it refers to a local file,
+    /// or returns nil to leave it unchanged.
+    nonisolated private static func localImageSrc(_ src: String, baseDir: URL) -> String? {
+        if src.hasPrefix("#") || src.isEmpty { return nil }
+
+        // Detect an explicit URL scheme (e.g. http:, https:, data:, asset:, mvimg:).
+        if let r = src.range(of: "^[a-zA-Z][a-zA-Z0-9+.-]*:", options: .regularExpression) {
+            let scheme = src[src.startIndex..<src.index(before: r.upperBound)].lowercased()
+            guard scheme == "file" else { return nil }  // leave non-file schemes alone
+            guard let path = URL(string: src)?.path, !path.isEmpty else { return nil }
+            return mvimgURL(forPath: path)
+        }
+
+        // No scheme: a relative or absolute local filesystem path.
+        let decoded = src.removingPercentEncoding ?? src
+        let fileURL = decoded.hasPrefix("/")
+            ? URL(fileURLWithPath: decoded)
+            : URL(fileURLWithPath: decoded, relativeTo: baseDir)
+        return mvimgURL(forPath: fileURL.standardizedFileURL.path)
+    }
+
+    nonisolated private static func mvimgURL(forPath path: String) -> String? {
+        var comps = URLComponents()
+        comps.scheme = "mvimg"
+        comps.host = "localhost"
+        comps.path = path  // absolute, begins with "/"; URLComponents percent-encodes
+        return comps.url?.absoluteString
     }
 
     func loadDocument() {
@@ -229,8 +294,10 @@ final class MarkdownWebViewController: NSViewController {
 
         if doc.text.count > Self.asyncRenderThreshold {
             // Off-main render for large files (cmark-gfm work).
+            let baseDir = doc.fileURL.deletingLastPathComponent()
             Task.detached(priority: .userInitiated) {
-                let body = MarkdownRenderer.render(text: sourceText, fileType: doc.fileType)
+                let rendered = MarkdownRenderer.render(text: sourceText, fileType: doc.fileType)
+                let body = Self.rewriteLocalImageSources(in: rendered, baseDir: baseDir)
                 await MainActor.run { [weak self] in
                     guard let self, self.nonce == newNonce else { return }
                     if DebugFlags.dumpHTML {
@@ -268,7 +335,9 @@ final class MarkdownWebViewController: NSViewController {
                 }
             }
         } else {
-            let body = MarkdownRenderer.render(text: sourceText, fileType: doc.fileType)
+            let baseDir = doc.fileURL.deletingLastPathComponent()
+            let rendered = MarkdownRenderer.render(text: sourceText, fileType: doc.fileType)
+            let body = Self.rewriteLocalImageSources(in: rendered, baseDir: baseDir)
             if DebugFlags.dumpHTML {
                 self.debugDumpHTML(
                     fullHTML: isUpdate ? nil : HTMLTemplate.build(body: body, settings: settings, zoomFactor: zoom, nonce: newNonce),

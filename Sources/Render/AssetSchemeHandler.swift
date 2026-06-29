@@ -75,3 +75,62 @@ final class AssetSchemeHandler: NSObject, WKURLSchemeHandler {
         }
     }
 }
+
+// Custom URL scheme handler for mvimg:// URLs.
+// Serves a local file from disk by the absolute path carried in the URL.
+// Document-relative <img src="..."> paths are rewritten to mvimg:// at load
+// time (see MarkdownWebView) because loadHTMLString(_:baseURL:) does not grant
+// the WebContent process read access to the document's directory, so plain
+// file:// images never load.
+final class LocalImageSchemeHandler: NSObject, WKURLSchemeHandler {
+
+    func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
+        guard let url = urlSchemeTask.request.url, !url.path.isEmpty else {
+            fail(urlSchemeTask, status: 400)
+            return
+        }
+
+        // url.path is the percent-decoded absolute filesystem path.
+        let fileURL = URL(fileURLWithPath: url.path)
+
+        guard let data = try? Data(contentsOf: fileURL) else {
+            fail(urlSchemeTask, status: 404)
+            return
+        }
+
+        let response = URLResponse(
+            url: url,
+            mimeType: mimeType(for: fileURL.pathExtension),
+            expectedContentLength: data.count,
+            textEncodingName: nil
+        )
+        urlSchemeTask.didReceive(response)
+        urlSchemeTask.didReceive(data)
+        urlSchemeTask.didFinish()
+    }
+
+    func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {}
+
+    private func fail(_ task: any WKURLSchemeTask, status: Int) {
+        let url = task.request.url ?? URL(string: "mvimg://error")!
+        let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)!
+        task.didReceive(response)
+        task.didFinish()
+    }
+
+    private func mimeType(for ext: String) -> String {
+        switch ext.lowercased() {
+        case "png":          return "image/png"
+        case "jpg", "jpeg":  return "image/jpeg"
+        case "gif":          return "image/gif"
+        case "svg":          return "image/svg+xml"
+        case "webp":         return "image/webp"
+        case "bmp":          return "image/bmp"
+        case "ico":          return "image/x-icon"
+        case "tif", "tiff":  return "image/tiff"
+        case "avif":         return "image/avif"
+        case "heic":         return "image/heic"
+        default:             return "application/octet-stream"
+        }
+    }
+}
