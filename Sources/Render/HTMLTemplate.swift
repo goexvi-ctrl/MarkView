@@ -277,6 +277,9 @@ enum HTMLTemplate {
         <script src="asset://vendor/katex.min.js"></script>
         <script src="asset://vendor/katex-auto-render.min.js"></script>
         <script src="asset://vendor/mermaid.min.js"></script>
+        <!-- Cmd-F find. find.js defines window.markviewFind/Step/ClearFind and, with
+             no #content in this page, searches document.body (both diff panes). -->
+        <script src="asset://find.js"></script>
         <script>
         const BRIDGE_NONCE = 'compare-only';
 

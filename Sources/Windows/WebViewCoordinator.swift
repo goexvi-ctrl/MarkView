@@ -56,6 +56,9 @@ final class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WK
             pendingScrollRestore = 0
             viewController?.restoreScroll(y)
         }
+        // A full page (re)load resets the JS find state; re-run any active search
+        // so highlights survive historical/comparison navigation while the bar is open.
+        viewController?.reapplyFindIfActive()
     }
 
     // MARK: - WKScriptMessageHandler (JS -> Swift bridge)

@@ -23,6 +23,11 @@ final class MarkdownWebViewController: NSViewController {
     var lastScrollY: Double = 0
     private var appearanceCancellable: AnyCancellable?
 
+    // Find-in-page (Cmd-F). The bar is a native AppKit view overlaid on the web
+    // view; the actual searching happens in app.js. nil while the bar is hidden.
+    // (internal access so the find logic in FindBar.swift can reach it.)
+    var findBar: FindBarView?
+
     // When non-nil we are viewing a git historical snapshot instead of the live
     // on-disk document text. The live document (and its fileURL/base) is kept for
     // title, relative asset resolution, and "return to current".
@@ -242,6 +247,7 @@ final class MarkdownWebViewController: NSViewController {
                         let js = "replaceDocumentContent(\"\(escaped)\")"
                         self.webView.evaluateJavaScript(js) { _, _ in
                             if let y = restoreScrollY { self.coordinator.pendingScrollRestore = y }
+                            self.reapplyFindIfActive()
                         }
                     } else {
                         let html = HTMLTemplate.build(
@@ -276,6 +282,7 @@ final class MarkdownWebViewController: NSViewController {
                 let js = "replaceDocumentContent(\"\(escaped)\")"
                 webView.evaluateJavaScript(js) { _, _ in
                     if let y = restoreScrollY { self.coordinator.pendingScrollRestore = y }
+                    self.reapplyFindIfActive()
                 }
             } else {
                 let html = HTMLTemplate.build(

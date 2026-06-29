@@ -125,6 +125,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Find in page (Cmd-F / Cmd-G / Cmd-Shift-G)
+
+    @objc func performFind(_ sender: Any?) {
+        DocumentWindowRegistry.shared.focusedController()?.showFindBar()
+    }
+
+    @objc func performFindNext(_ sender: Any?) {
+        DocumentWindowRegistry.shared.focusedController()?.findNext()
+    }
+
+    @objc func performFindPrevious(_ sender: Any?) {
+        DocumentWindowRegistry.shared.focusedController()?.findPrevious()
+    }
+
     // Temporary debug hook for H1 git recall (remove or hide behind #if DEBUG later).
     @objc func debugViewFirstHistoricalVersion(_ sender: Any?) {
         guard let controller = DocumentWindowRegistry.shared.focusedController() else { return }

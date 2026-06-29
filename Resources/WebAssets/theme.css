@@ -256,4 +256,34 @@ pre:hover .code-toolbar { opacity: 1; }
   overflow-x: auto;
 }
 
+/* Find-in-page highlights (Cmd-F). Injected by app.js as <mark class="mv-find">.
+   Yellow for all matches, orange for the current match. Dark text on both so the
+   highlight stays readable in either light or dark appearance. */
+mark.mv-find {
+  background: #fff3a3;
+  color: #1f2328;
+  border-radius: 2px;
+  /* Cancel the <mark> default that some UA stylesheets add. */
+  padding: 0;
+}
+mark.mv-find-current {
+  background: #ff9632;
+  color: #1f2328;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+/* Whole-formula match highlight. KaTeX math can't be highlighted per-character
+   without breaking layout, so a matched formula's .katex box is tinted. The tint
+   is translucent (math colors show through, readable in light or dark) and the
+   box-shadow acts as a non-reflowing outline. */
+.katex.mv-find-formula {
+  background-color: rgba(255, 213, 0, 0.35);
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px rgba(255, 204, 0, 0.9);
+}
+.katex.mv-find-formula.mv-find-current {
+  background-color: rgba(255, 150, 50, 0.5);
+  box-shadow: 0 0 0 2px #ff9632;
+}
+
 

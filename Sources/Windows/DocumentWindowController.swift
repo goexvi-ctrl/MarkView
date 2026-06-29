@@ -250,6 +250,12 @@ final class DocumentWindowController: NSWindowController {
         webViewController?.reloadCurrentDocument()
     }
 
+    // MARK: - Find in page (Cmd-F)
+
+    func showFindBar() { webViewController?.showFindBar() }
+    func findNext() { webViewController?.findBarNext() }
+    func findPrevious() { webViewController?.findBarPrevious() }
+
     // MARK: - Git historical recall (H1.3)
 
     /// Asynchronously fetch the content for `version` (a git blob) and switch the

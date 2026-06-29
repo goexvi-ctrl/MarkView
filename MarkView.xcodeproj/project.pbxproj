@@ -17,6 +17,7 @@
 		5F002011000000000000BBBB /* DocumentWindowRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001011000000000000BBBB /* DocumentWindowRegistry.swift */; };
 		5F002012000000000000BBBB /* MarkdownWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001012000000000000BBBB /* MarkdownWebView.swift */; };
 		5F002013000000000000BBBB /* WebViewCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001013000000000000BBBB /* WebViewCoordinator.swift */; };
+		5F002017000000000000BBBB /* FindBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001017000000000000BBBB /* FindBar.swift */; };
 		5F002020000000000000BBBB /* MarkdownDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001020000000000000BBBB /* MarkdownDocument.swift */; };
 		5F002021000000000000BBBB /* DocumentKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001021000000000000BBBB /* DocumentKey.swift */; };
 		5F002022000000000000BBBB /* FileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001022000000000000BBBB /* FileWatcher.swift */; };
@@ -57,6 +58,7 @@
 		5F001011000000000000BBBB /* DocumentWindowRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWindowRegistry.swift; sourceTree = "<group>"; };
 		5F001012000000000000BBBB /* MarkdownWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownWebView.swift; sourceTree = "<group>"; };
 		5F001013000000000000BBBB /* WebViewCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewCoordinator.swift; sourceTree = "<group>"; };
+		5F001017000000000000BBBB /* FindBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindBar.swift; sourceTree = "<group>"; };
 		5F001020000000000000BBBB /* MarkdownDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownDocument.swift; sourceTree = "<group>"; };
 		5F001021000000000000BBBB /* DocumentKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentKey.swift; sourceTree = "<group>"; };
 		5F001022000000000000BBBB /* FileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcher.swift; sourceTree = "<group>"; };
@@ -180,6 +182,7 @@
 				5F001011000000000000BBBB /* DocumentWindowRegistry.swift */,
 				5F001012000000000000BBBB /* MarkdownWebView.swift */,
 				5F001013000000000000BBBB /* WebViewCoordinator.swift */,
+				5F001017000000000000BBBB /* FindBar.swift */,
 			);
 			path = Windows;
 			sourceTree = "<group>";
@@ -352,6 +355,7 @@
 				5F002011000000000000BBBB /* DocumentWindowRegistry.swift in Sources */,
 				5F002012000000000000BBBB /* MarkdownWebView.swift in Sources */,
 				5F002013000000000000BBBB /* WebViewCoordinator.swift in Sources */,
+				5F002017000000000000BBBB /* FindBar.swift in Sources */,
 				5F002020000000000000BBBB /* MarkdownDocument.swift in Sources */,
 				5F002021000000000000BBBB /* DocumentKey.swift in Sources */,
 				5F002022000000000000BBBB /* FileWatcher.swift in Sources */,

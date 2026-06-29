@@ -26,6 +26,26 @@ struct MarkViewApp: App {
                 OpenRecentMenu()
             }
 
+            // Find (Edit menu). Standard macOS Cmd-F / Cmd-G / Cmd-Shift-G.
+            CommandGroup(after: .textEditing) {
+                Section {
+                    Button("Find…") {
+                        NSApp.sendAction(#selector(AppDelegate.performFind(_:)), to: nil, from: nil)
+                    }
+                    .keyboardShortcut("f", modifiers: .command)
+
+                    Button("Find Next") {
+                        NSApp.sendAction(#selector(AppDelegate.performFindNext(_:)), to: nil, from: nil)
+                    }
+                    .keyboardShortcut("g", modifiers: .command)
+
+                    Button("Find Previous") {
+                        NSApp.sendAction(#selector(AppDelegate.performFindPrevious(_:)), to: nil, from: nil)
+                    }
+                    .keyboardShortcut("g", modifiers: [.command, .shift])
+                }
+            }
+
             // Help menu
             CommandGroup(replacing: .help) {
                 Button("Markdown Cheat Sheet") {
