@@ -567,23 +567,22 @@ final class DocumentWindowController: NSWindowController {
         rightLabel: String,
         leftFileType: MarkdownDocument.FileType,
         rightFileType: MarkdownDocument.FileType
-    ) -> (html: String, stats: String) {
-        let leftLines = leftText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        let rightLines = rightText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        let (lAnn, rAnn) = DiffAnnotator.annotatedLines(leftLines: leftLines, rightLines: rightLines)
-
-        let (leftDiffed, rightDiffed) = DiffAnnotator.diffedMarkdownSourcesWordByWord(leftText: leftText, rightText: rightText)
-
+    ) async -> (html: String, stats: String) {
         // Respect the user's sanitizer setting; the injected diff markup
         // (del/ins/span/div with class) survives the GitHub-style allowlist.
         let allowUnsafe = SettingsStore.shared.allowUnsafeHTML
-        let leftBody = MarkdownRenderer.render(text: leftDiffed, fileType: leftFileType, allowUnsafeHTML: allowUnsafe)
-        let rightBody = MarkdownRenderer.render(text: rightDiffed, fileType: rightFileType, allowUnsafeHTML: allowUnsafe)
 
-        let removedCount = lAnn.filter { $0.1 }.count
-        let addedCount = rAnn.filter { $0.1 }.count
-        let stats = (removedCount == 0 && addedCount == 0) ? "identical" : "\(removedCount) removed, \(addedCount) added (source lines)"
+        // The diff annotation and the two cmark renders are CPU-bound and don't
+        // touch the UI, so do them off the main actor (the await below hops off).
+        let (leftBody, rightBody, stats) = await Self.renderComparisonBodies(
+            leftText: leftText,
+            rightText: rightText,
+            leftFileType: leftFileType,
+            rightFileType: rightFileType,
+            allowUnsafeHTML: allowUnsafe
+        )
 
+        // Cheap final assembly stays on the main actor (reads settings + zoom).
         let html = HTMLTemplate.buildComparison(
             leftBody: leftBody,
             rightBody: rightBody,
@@ -594,6 +593,37 @@ final class DocumentWindowController: NSWindowController {
             zoomFactor: self.zoomFactor
         )
         return (html, stats)
+    }
+
+    /// Off-main worker: line/word diff annotation plus both side renders. The two
+    /// renders are independent CPU work, so each runs in its own detached task and
+    /// they proceed concurrently.
+    nonisolated private static func renderComparisonBodies(
+        leftText: String,
+        rightText: String,
+        leftFileType: MarkdownDocument.FileType,
+        rightFileType: MarkdownDocument.FileType,
+        allowUnsafeHTML: Bool
+    ) async -> (leftBody: String, rightBody: String, stats: String) {
+        let leftLines = leftText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let rightLines = rightText.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let (lAnn, rAnn) = DiffAnnotator.annotatedLines(leftLines: leftLines, rightLines: rightLines)
+
+        let (leftDiffed, rightDiffed) = DiffAnnotator.diffedMarkdownSourcesWordByWord(leftText: leftText, rightText: rightText)
+
+        let leftRender = Task.detached {
+            MarkdownRenderer.render(text: leftDiffed, fileType: leftFileType, allowUnsafeHTML: allowUnsafeHTML)
+        }
+        let rightRender = Task.detached {
+            MarkdownRenderer.render(text: rightDiffed, fileType: rightFileType, allowUnsafeHTML: allowUnsafeHTML)
+        }
+        let leftBody = await leftRender.value
+        let rightBody = await rightRender.value
+
+        let removedCount = lAnn.filter { $0.1 }.count
+        let addedCount = rAnn.filter { $0.1 }.count
+        let stats = (removedCount == 0 && addedCount == 0) ? "identical" : "\(removedCount) removed, \(addedCount) added (source lines)"
+        return (leftBody, rightBody, stats)
     }
 
     private func loadComparisonContent(left: GitVersion, right: GitVersion, showBanner: Bool) async {
@@ -608,7 +638,7 @@ final class DocumentWindowController: NSWindowController {
             let leftLabel = "\(left.shortSha) — \(left.subject)"
             let rightLabel = right.isWorkingTree ? "Working tree (current on disk)" : "\(right.shortSha) — \(right.subject)"
 
-            let (html, _) = buildComparisonHTML(
+            let (html, _) = await buildComparisonHTML(
                 leftText: leftText,
                 rightText: rightText,
                 leftLabel: leftLabel,
@@ -658,7 +688,7 @@ final class DocumentWindowController: NSWindowController {
         rightFileType: MarkdownDocument.FileType,
         rightURL: URL
     ) async {
-        let (html, _) = buildComparisonHTML(
+        let (html, _) = await buildComparisonHTML(
             leftText: leftText,
             rightText: rightText,
             leftLabel: leftLabel,
@@ -768,7 +798,7 @@ final class DocumentWindowController: NSWindowController {
 
                 guard let rText = rightText else { return }
 
-                let (html, _) = self.buildComparisonHTML(
+                let (html, _) = await self.buildComparisonHTML(
                     leftText: leftText,
                     rightText: rText,
                     leftLabel: state.leftLabel,
