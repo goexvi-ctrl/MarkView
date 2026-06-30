@@ -89,21 +89,53 @@ enum DiffAnnotator {
     static func longestCommonSubsequence(_ a: [String], _ b: [String]) -> [String] {
         let m = a.count, n = b.count
         guard m > 0 && n > 0 else { return [] }
-        var dp = Array(repeating: Array(repeating: 0, count: n + 1), count: m + 1)
-        for i in 1...m {
-            for j in 1...n {
-                if a[i-1] == b[j-1] {
+
+        // Trim the common prefix and suffix before running the O(m*n) DP. These
+        // shared ends are always part of an optimal LCS, so this stays exact —
+        // but for two near-identical versions of the same document (the entire
+        // point of the comparison view) it shrinks a ~10k x 10k word table down
+        // to just the changed region, turning a multi-second, ~1 GB diff into a
+        // few milliseconds.
+        var lo = 0
+        while lo < m && lo < n && a[lo] == b[lo] { lo += 1 }
+        var hiA = m, hiB = n
+        while hiA > lo && hiB > lo && a[hiA - 1] == b[hiB - 1] { hiA -= 1; hiB -= 1 }
+
+        let prefix = Array(a[0..<lo])
+        let suffix = Array(a[hiA..<m])
+
+        let midA = Array(a[lo..<hiA])
+        let midB = Array(b[lo..<hiB])
+        let mm = midA.count, mn = midB.count
+        if mm == 0 || mn == 0 {
+            return prefix + suffix
+        }
+
+        // Guard against a pathological near-total rewrite, where the DP table
+        // could still allocate hundreds of megabytes. Above the cap we treat the
+        // whole changed region as replaced (prefix+suffix is still a valid common
+        // subsequence); the renderer just shows that region fully highlighted on
+        // both sides instead of teasing out word-level islands.
+        let cellCap = 2_000_000
+        if mm * mn > cellCap {
+            return prefix + suffix
+        }
+
+        var dp = Array(repeating: Array(repeating: 0, count: mn + 1), count: mm + 1)
+        for i in 1...mm {
+            for j in 1...mn {
+                if midA[i-1] == midB[j-1] {
                     dp[i][j] = dp[i-1][j-1] + 1
                 } else {
                     dp[i][j] = max(dp[i-1][j], dp[i][j-1])
                 }
             }
         }
-        var res: [String] = []
-        var i = m, j = n
+        var mid: [String] = []
+        var i = mm, j = mn
         while i > 0 && j > 0 {
-            if a[i-1] == b[j-1] {
-                res.insert(a[i-1], at: 0)
+            if midA[i-1] == midB[j-1] {
+                mid.append(midA[i-1])
                 i -= 1
                 j -= 1
             } else if dp[i-1][j] > dp[i][j-1] {
@@ -112,7 +144,7 @@ enum DiffAnnotator {
                 j -= 1
             }
         }
-        return res
+        return prefix + mid.reversed() + suffix
     }
 
     static func extractWords(_ text: String) -> [String] {
@@ -346,33 +378,66 @@ enum DiffAnnotator {
     /// original source as an NSRegularExpression replacement template, which
     /// silently stripped LaTeX backslashes ("\\color" became "color").
     private static func restoreAtoms(in wrapped: String, placeholders: [String: Atom], removedSide: Bool) -> String {
+        guard !placeholders.isEmpty else { return wrapped }
+
         let cls = removedSide ? "diff-removed" : "diff-added"
         let color = removedSide ? "red" : "green"
         let openTag = removedSide ? "<del class=\"diff-removed\">" : "<ins class=\"diff-added\">"
         let closeTag = removedSide ? "</del>" : "</ins>"
 
-        var result = wrapped
-        for (ph, atom) in placeholders {
-            let wrappedToken = openTag + ph + closeTag
-            if result.contains(wrappedToken) {
-                let replacement: String
-                switch atom.kind {
-                case .math:
-                    replacement = "<span class=\"\(cls)\">" + insertColorIntoMath(atom.content, color: color) + "</span>"
-                case .inlineCode:
-                    replacement = "<span class=\"\(cls)\">" + atom.content + "</span>"
-                case .blockCode:
-                    // Blank lines end the <div> HTML block before the fence starts,
-                    // so cmark still renders the fence as a normal code block while
-                    // the div supplies the whole-block tint.
-                    let block = atom.content.trimmingCharacters(in: .newlines)
-                    replacement = "\n<div class=\"\(cls)\">\n\n" + block + "\n\n</div>\n"
-                }
-                result = result.replacingOccurrences(of: wrappedToken, with: replacement)
+        func wrappedReplacement(_ atom: Atom) -> String {
+            switch atom.kind {
+            case .math:
+                return "<span class=\"\(cls)\">" + insertColorIntoMath(atom.content, color: color) + "</span>"
+            case .inlineCode:
+                return "<span class=\"\(cls)\">" + atom.content + "</span>"
+            case .blockCode:
+                // Blank lines end the <div> HTML block before the fence starts,
+                // so cmark still renders the fence as a normal code block while
+                // the div supplies the whole-block tint.
+                let block = atom.content.trimmingCharacters(in: .newlines)
+                return "\n<div class=\"\(cls)\">\n\n" + block + "\n\n</div>\n"
             }
-            // Unchanged (or punctuation-fused) placeholders: restore the clean original.
-            result = result.replacingOccurrences(of: ph, with: atom.content)
         }
-        return result
+
+        // Single left-to-right pass. Each placeholder token (\u{0001}M<hash>\u{0001})
+        // is a unique, non-overlapping word; we substitute it in one scan instead of
+        // running replacingOccurrences once per placeholder over the whole document,
+        // which was O(placeholders * length) and dominated the comparison render.
+        // A changed atom appears wrapped as <del/ins ...>TOKEN</del/ins>; an unchanged
+        // one appears bare. The optional surrounding tags are captured so a wrapped
+        // atom is re-emitted as kind-specific markup and a bare one as clean content.
+        let escapedOpen = NSRegularExpression.escapedPattern(for: openTag)
+        let escapedClose = NSRegularExpression.escapedPattern(for: closeTag)
+        let pattern = "(\(escapedOpen))?(\u{0001}M[0-9]+\u{0001})(\(escapedClose))?"
+
+        guard let re = try? NSRegularExpression(pattern: pattern) else { return wrapped }
+
+        let ns = wrapped as NSString
+        var out = ""
+        var last = 0
+        for m in re.matches(in: wrapped, range: NSRange(location: 0, length: ns.length)) {
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
+            last = m.range.location + m.range.length
+
+            let token = ns.substring(with: m.range(at: 2))
+            let hasOpen = m.range(at: 1).location != NSNotFound
+            let hasClose = m.range(at: 3).location != NSNotFound
+
+            guard let atom = placeholders[token] else {
+                out += ns.substring(with: m.range)  // unknown token: leave verbatim
+                continue
+            }
+            if hasOpen && hasClose {
+                out += wrappedReplacement(atom)
+            } else {
+                // Bare (unchanged) token. Preserve any stray half-wrap defensively.
+                if hasOpen { out += openTag }
+                out += atom.content
+                if hasClose { out += closeTag }
+            }
+        }
+        out += ns.substring(from: last)
+        return out
     }
 }

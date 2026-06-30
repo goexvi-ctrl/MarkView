@@ -21,6 +21,33 @@ struct DiffAnnotatorTests {
         #expect(DiffAnnotator.longestCommonSubsequence(["a", "b"], ["c", "d"]).isEmpty)
     }
 
+    @Test("LCS stays exact across a changed middle (prefix/suffix trim)")
+    func lcsTrimmedMiddle() {
+        // Shared prefix [p1,p2] and suffix [s1,s2] around a divergent middle.
+        let a = ["p1", "p2", "x", "y", "z", "s1", "s2"]
+        let b = ["p1", "p2", "x", "w", "z", "s1", "s2"]
+        // The optimal LCS keeps the shared ends plus the common "x" and "z".
+        #expect(DiffAnnotator.longestCommonSubsequence(a, b) == ["p1", "p2", "x", "z", "s1", "s2"])
+    }
+
+    @Test("Large near-identical inputs diff correctly and quickly")
+    func largeNearIdentical() {
+        // A single changed word inside a long, otherwise-shared body. This is the
+        // realistic comparison case; prefix/suffix trimming must keep it correct.
+        var words = (0..<4000).map { "w\($0)" }
+        let leftText = words.joined(separator: " ")
+        words[2000] = "CHANGED"
+        let rightText = words.joined(separator: " ")
+
+        let (left, right) = DiffAnnotator.diffedMarkdownSourcesWordByWord(
+            leftText: leftText, rightText: rightText
+        )
+        #expect(left.contains("<del class=\"diff-removed\">w2000</del>"))
+        #expect(right.contains("<ins class=\"diff-added\">CHANGED</ins>"))
+        // Untouched words must not be wrapped.
+        #expect(!left.contains("<del class=\"diff-removed\">w1999</del>"))
+    }
+
     @Test("Changed words get del/ins wrappers, common words do not")
     func wordWrappers() {
         let (left, right) = DiffAnnotator.diffedMarkdownSourcesWordByWord(
