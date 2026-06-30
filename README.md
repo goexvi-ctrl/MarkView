@@ -5,7 +5,7 @@
 MarkView is a Markdown reader for macOS. You point it at a `.md` file and it
 shows you the rendered document — close to how it would look on GitHub — in an
 ordinary native window. It doesn't edit, it doesn't sync, and it never asks you
-to sign in. It just reads.
+to sign in. It just reads. Oh, and it diffs, too.
 
 The reason it exists is that most Markdown never reaches GitHub. Notes, design
 docs, the READMEs and scratch files that command-line tools (Claude among them)
