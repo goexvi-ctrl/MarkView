@@ -122,12 +122,20 @@ final class DocumentWindowController: NSWindowController {
                 _ = try await self.gitClient.repoContext(for: self.markdownDocument.fileURL)
                 await MainActor.run {
                     self.isInGitRepository = true
+                    // Show the revision selector now (it will read "Loading history…"
+                    // until the list arrives); it was not installed at window setup
+                    // because we did not yet know this was a git repository.
+                    self.updateRevisionControls()
                     self.loadHistoryInBackground()
                     MenuCommandState.shared.refresh()
                 }
             } catch {
+                // Not a git repository, or it can't be read (e.g. the file lives in a
+                // repo owned by another user and git reports "dubious ownership").
+                // Leave the title bar clean rather than stranding a "Loading history…" tab.
                 await MainActor.run {
                     self.isInGitRepository = false
+                    self.updateRevisionControls()
                     MenuCommandState.shared.refresh()
                 }
             }
@@ -862,8 +870,17 @@ final class DocumentWindowController: NSWindowController {
                     self.updateRevisionControls()
                 }
             } catch {
-                // Non-fatal for stepping; the user can still use explicit version pickers later.
-                // We leave any previously loaded list in place.
+                if Task.isCancelled { return }
+                // History could not be read (permissions, dubious ownership surfacing
+                // only on `git log`, a detached/partial work tree, etc.). If we never
+                // loaded any versions, drop the git affordances for this window instead
+                // of leaving the selector stuck on "Loading history…".
+                await MainActor.run { [weak self] in
+                    guard let self, self.historyVersions.isEmpty else { return }
+                    self.isInGitRepository = false
+                    self.updateRevisionControls()
+                    MenuCommandState.shared.refresh()
+                }
             }
         }
     }
@@ -1230,21 +1247,26 @@ final class DocumentWindowController: NSWindowController {
             updateInfoButtonForCurrentMode()
 
         } else {
-            // Single view mode: only the regular revision selector.
-            let container = NSView(frame: NSRect(x: 0, y: 0, width: 170, height: 22))
+            // Single view mode: only the regular revision selector, and only when the
+            // document is actually inside a readable git repository. Otherwise the title
+            // bar stays clean — no perpetual "Loading history…" pop-up for plain files
+            // or repos we can't read.
+            if isInGitRepository {
+                let container = NSView(frame: NSRect(x: 0, y: 0, width: 170, height: 22))
 
-            if let singleBtn = revisionPopUpButton {
-                singleBtn.frame = NSRect(x: 0, y: 0, width: 160, height: 22)
-                container.addSubview(singleBtn)
+                if let singleBtn = revisionPopUpButton {
+                    singleBtn.frame = NSRect(x: 0, y: 0, width: 160, height: 22)
+                    container.addSubview(singleBtn)
+                }
+
+                let acc = NSTitlebarAccessoryViewController()
+                acc.view = container
+                acc.layoutAttribute = .leading
+                window?.addTitlebarAccessoryViewController(acc)
+                singleRevisionAccessory = acc
+
+                updateRevisionPopUpButton()
             }
-
-            let acc = NSTitlebarAccessoryViewController()
-            acc.view = container
-            acc.layoutAttribute = .leading
-            window?.addTitlebarAccessoryViewController(acc)
-            singleRevisionAccessory = acc
-
-            updateRevisionPopUpButton()
             updateInfoButtonForCurrentMode()
         }
     }
