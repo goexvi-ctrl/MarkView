@@ -1,4 +1,6 @@
 import SwiftUI
+import AppKit
+import Combine
 
 @main
 struct MarkViewApp: App {
@@ -102,26 +104,75 @@ struct MarkViewApp: App {
                 }
                 .keyboardShortcut("r", modifiers: .command)
 
-                Button("Compare with File...") {
-                    NSApp.sendAction(#selector(AppDelegate.compareDocumentWithFile(_:)), to: nil, from: nil)
-                }
-                .keyboardShortcut("d", modifiers: [.command, .shift])
-
-                Divider()
-
-                // Temporary H1 debug hook. Opens the first prior git version of the
-                // current document (if any) using the new historical recall path.
-                Button("Debug: View First Historical (git)") {
-                    NSApp.sendAction(#selector(AppDelegate.debugViewFirstHistoricalVersion(_:)), to: nil, from: nil)
-                }
-
-                // H2 debug: basic side-by-side comparison surface (live vs first commit).
-                // Uses GitClient.diffHunks + dual MarkdownRenderer + synthetic comparison HTML.
-                Button("Debug: Compare live vs first historical (git)") {
-                    NSApp.sendAction(#selector(AppDelegate.debugCompareLiveWithFirstHistorical(_:)), to: nil, from: nil)
-                }
+                // Compare/version commands share one section. The git-only items are
+                // disabled when the focused document is not inside a git repository.
+                CompareCommands()
             }
         }
+    }
+}
+
+// MARK: - Compare / version commands
+
+/// The "Compare" family of menu items, grouped in one section. "Compare with
+/// File…" works for any open document; the two git items operate on the version
+/// committed before the working copy and are disabled when the focused document
+/// is not inside a git repository.
+private struct CompareCommands: View {
+    @ObservedObject private var menuState = MenuCommandState.shared
+
+    var body: some View {
+        Section {
+            Button("Compare with File…") {
+                NSApp.sendAction(#selector(AppDelegate.compareDocumentWithFile(_:)), to: nil, from: nil)
+            }
+            .keyboardShortcut("d", modifiers: [.command, .shift])
+            .disabled(!menuState.hasDocument)
+
+            Button("Compare with Previous Version") {
+                NSApp.sendAction(#selector(AppDelegate.debugCompareLiveWithFirstHistorical(_:)), to: nil, from: nil)
+            }
+            .disabled(!menuState.focusedDocumentInGit)
+
+            Button("View Previous Version") {
+                NSApp.sendAction(#selector(AppDelegate.debugViewFirstHistoricalVersion(_:)), to: nil, from: nil)
+            }
+            .disabled(!menuState.focusedDocumentInGit)
+        }
+    }
+}
+
+/// Observable enabled-state for document-scoped menu commands. AppKit owns the
+/// document windows, so SwiftUI's `@FocusedValue` can't see them; instead we
+/// recompute from the focused window controller whenever key-window focus
+/// changes (and when a window's git detection finishes — see
+/// DocumentWindowController).
+@MainActor
+final class MenuCommandState: ObservableObject {
+    static let shared = MenuCommandState()
+
+    @Published private(set) var hasDocument = false
+    @Published private(set) var focusedDocumentInGit = false
+
+    private init() {
+        let nc = NotificationCenter.default
+        let names: [Notification.Name] = [
+            NSWindow.didBecomeKeyNotification,
+            NSWindow.didResignKeyNotification,
+            NSWindow.willCloseNotification,
+        ]
+        for name in names {
+            nc.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.refresh() }
+            }
+        }
+    }
+
+    /// Recompute from the currently focused document window.
+    func refresh() {
+        let controller = DocumentWindowRegistry.shared.focusedController()
+        hasDocument = controller != nil
+        focusedDocumentInGit = controller?.isInGitRepository ?? false
     }
 }
 

@@ -123,9 +123,13 @@ final class DocumentWindowController: NSWindowController {
                 await MainActor.run {
                     self.isInGitRepository = true
                     self.loadHistoryInBackground()
+                    MenuCommandState.shared.refresh()
                 }
             } catch {
-                await MainActor.run { self.isInGitRepository = false }
+                await MainActor.run {
+                    self.isInGitRepository = false
+                    MenuCommandState.shared.refresh()
+                }
             }
         }
 
