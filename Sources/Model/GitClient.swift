@@ -254,7 +254,19 @@ final class GitClient {
         // Prefer /usr/bin/env so we ride the user's PATH for git.
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = arguments
+
+        // Trust the repository regardless of who owns it. MarkView is a local,
+        // read-only viewer operating on files the user explicitly opened, so a
+        // document living in a repo owned by another account (e.g. opening one
+        // user's file while signed in as another) should still surface history
+        // instead of failing git's "dubious ownership" guard. safe.directory is
+        // only honored from protected configuration; the command scope (-c)
+        // qualifies, so this is the supported way to set it per-invocation.
+        var args = arguments
+        if args.first == "git" {
+            args.insert(contentsOf: ["-c", "safe.directory=*"], at: 1)
+        }
+        process.arguments = args
 
         let outPipe = Pipe()
         let errPipe = Pipe()
