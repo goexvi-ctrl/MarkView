@@ -237,22 +237,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.compareWithOtherFile()
     }
 
-    @objc func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        if menuItem.action == #selector(debugViewFirstHistoricalVersion(_:)) {
-            guard let controller = DocumentWindowRegistry.shared.focusedController() else {
-                return false
-            }
-            return controller.isInGitRepository
-        }
-        if menuItem.action == #selector(debugCompareLiveWithFirstHistorical(_:)) {
-            guard let controller = DocumentWindowRegistry.shared.focusedController() else {
-                return false
-            }
-            return controller.isInGitRepository
-        }
-        if menuItem.action == #selector(compareDocumentWithFile(_:)) {
-            return DocumentWindowRegistry.shared.focusedController() != nil
-        }
-        return true
-    }
 }
