@@ -262,9 +262,14 @@ final class GitClient {
         // instead of failing git's "dubious ownership" guard. safe.directory is
         // only honored from protected configuration; the command scope (-c)
         // qualifies, so this is the supported way to set it per-invocation.
+        //
+        // Trusting a foreign repo means git will parse its config, which could
+        // otherwise name a program to run (e.g. core.fsmonitor) during ordinary
+        // commands. Disable that one auto-exec vector so reading an untrusted
+        // repository can't run code.
         var args = arguments
         if args.first == "git" {
-            args.insert(contentsOf: ["-c", "safe.directory=*"], at: 1)
+            args.insert(contentsOf: ["-c", "safe.directory=*", "-c", "core.fsmonitor=false"], at: 1)
         }
         process.arguments = args
 
