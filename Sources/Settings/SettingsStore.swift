@@ -48,6 +48,12 @@ final class SettingsStore: ObservableObject {
     @Published var showComparisonBanner: Bool {
         didSet { ud.set(showComparisonBanner, forKey: "showComparisonBanner") }
     }
+    /// When true, opening a file adds it as a tab to the frontmost window instead of
+    /// spawning a separate window. With no windows open it always opens in its own
+    /// window. Off by default (each file gets its own window, the historical behavior).
+    @Published var openFilesInTabs: Bool {
+        didSet { ud.set(openFilesInTabs, forKey: "openFilesInTabs") }
+    }
 
     private init() {
         bodyFont           = ud.string(forKey: "bodyFont") ?? ""
@@ -60,6 +66,7 @@ final class SettingsStore: ObservableObject {
         let storedRecent   = ud.integer(forKey: "maxRecentDocuments")
         maxRecentDocuments = storedRecent > 0 ? storedRecent : 20
         showComparisonBanner = ud.bool(forKey: "showComparisonBanner")  // defaults to false
+        openFilesInTabs      = ud.bool(forKey: "openFilesInTabs")       // defaults to false
     }
 
     // JSON for applySettings() bridge call

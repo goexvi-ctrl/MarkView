@@ -28,6 +28,8 @@ struct SettingsView: View {
                     }
                     Toggle("Show comparison view banner", isOn: $settings.showComparisonBanner)
                         .help("Show the blue \"Comparison view (read-only)\" banner while diffing two files. The titlebar \"x\" exits the diff either way.")
+                    Toggle("Open files as tabs in the frontmost window", isOn: $settings.openFilesInTabs)
+                        .help("When opening a file, add it as a tab to the frontmost window instead of a new window. With no windows open, it always opens in its own window.")
                 }
 
                 Section("History") {

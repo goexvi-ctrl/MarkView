@@ -32,9 +32,19 @@ final class DocumentWindowRegistry {
             showError("Cannot open \(url.lastPathComponent): \(error.localizedDescription)")
             return
         }
+        // Decide the tab host *before* creating the new window so the new window can
+        // never be chosen as its own host. When the setting is on and a live window is
+        // frontmost, the file joins that window's tab group; otherwise it opens on its own.
+        let tabHost: NSWindow? = SettingsStore.shared.openFilesInTabs ? foremostDocumentWindow() : nil
+
         let controller = DocumentWindowController(document: doc)
         windows[key] = controller
-        controller.showWindow(nil)
+        if let tabHost, let newWindow = controller.window {
+            tabHost.addTabbedWindow(newWindow, ordered: .above)
+            newWindow.makeKeyAndOrderFront(nil)
+        } else {
+            controller.showWindow(nil)
+        }
         RecentDocumentsStore.shared.add(url)
         postSessionChanged()
 
@@ -51,6 +61,18 @@ final class DocumentWindowRegistry {
                 self.postSessionChanged()
             }
         }
+    }
+
+    /// The frontmost live document window, used as the tab host when "open files in tabs"
+    /// is enabled. Prefers the key window, then the main window, then the frontmost of any
+    /// live document window. Historical-snapshot windows (not in `windows`) are never hosts.
+    /// Returns nil when no live document window exists, so the caller opens a new window.
+    private func foremostDocumentWindow() -> NSWindow? {
+        let docWindows = Set(windows.values.compactMap(\.window))
+        guard !docWindows.isEmpty else { return nil }
+        if let key = NSApp.keyWindow, docWindows.contains(key) { return key }
+        if let main = NSApp.mainWindow, docWindows.contains(main) { return main }
+        return NSApp.orderedWindows.first { docWindows.contains($0) }
     }
 
     /// Notify that the open-window set (or a window's diff state) changed so the
