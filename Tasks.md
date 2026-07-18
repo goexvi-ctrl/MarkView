@@ -289,6 +289,108 @@ phasing (A then B then C), and constraints from Design.md.
 
 ---
 
+## P - iPad Version (MarkViewPad)
+
+Native iPadOS viewer target added to MarkView.xcodeproj. Opens .md/.markdown/.txt
+from the Files app (open-in-place) and accepts documents from other apps via the
+standard document mechanisms (share sheet "Open in MarkView", drag and drop into
+the document browser, Mail/Safari attachments). Shares the full render pipeline
+(cmark-gfm, HTMLTemplate, sanitizer, WebAssets) with the macOS app. No git
+support in the iPad target by design.
+
+- [TESTED] P1.1 Shared-code prep: remove unused AppKit import from
+  MarkdownRenderer; extract local-image rewriting from MarkdownWebView into
+  Render/LocalImageRewriter.swift (pure Foundation, both targets).
+  macOS build green + all 30 SPM tests pass after the refactor.
+- [TESTED] P1.2 MarkViewPad target in MarkView.xcodeproj: iOS app target
+  (iPad-only, deployment target 17.0), CmarkGFM dependency, WebAssets +
+  asset catalog resources, shared sources, shared MarkViewPad scheme.
+  Builds clean for iOS Simulator via `xcodebuild -scheme MarkViewPad`.
+- [CODED] P1.3 Info-iPad.plist: markdown + plain-text document types (Viewer),
+  UTImportedTypeDeclarations for net.daringfireball.markdown,
+  LSSupportsOpeningDocumentsInPlace, single-scene manifest, CFBundleURLTypes
+  for markview://. Needs manual verification that MarkView appears in the
+  Files app / share sheet for .md files.
+- [CODED] P1.4 Document layer: single-window app (WindowGroup) with an in-app
+  tab strip (DocumentTabs.swift: OpenDocument, DocumentTabsModel,
+  DocumentTabsView). All open documents are tabs in one window; Files-app
+  opens (onOpenURL, security-scoped, open-in-place), the in-app file picker
+  (fileImporter), markview:// URLs, and internal .md links all become tabs
+  (dedupe by canonical path; per-tab scroll position preserved across tab
+  switches). Replaced the earlier DocumentGroup(viewing:) design, which put
+  every document in its own scene, after user feedback asking for tabs.
+  UTF-8 decode with ISO-Latin-1 lossy fallback throughout.
+- [CODED] P1.5 Viewer UI: DocumentViewerView (toolbar with font-size zoom,
+  find, settings sheet; banners for lossy encoding and link errors) +
+  PadWebView (WKWebView representable: asset:// + mvimg:// handlers, bridge
+  with nonce, link classification, copy-to-UIPasteboard, dark/light
+  appearance, per-document zoom memory, native find interaction).
+- [CODED] P1.6 Settings sheet (font size, code block mode, theme, allow unsafe
+  HTML) backed by the shared SettingsStore; live propagation to the web view.
+- [TESTED] P1.7 Build verification: macOS target still builds, SPM unit tests
+  green (30/30), MarkViewPad builds for iOS Simulator; installed + launched
+  on the iPad Pro 11-inch simulator. Rendering verified via screenshots:
+  Example.md (headings, emphasis, rules) and an inline-scheme document
+  (KaTeX math typeset, Go code block styled) both render correctly in tabs.
+  Remaining manual steps: mermaid diagrams, and the Files-app
+  "Open in MarkView" path on a real device.
+- [TESTED] P1.8 markview:// URL scheme so other apps can hand over content
+  programmatically (launching MarkView if needed):
+    markview://view?text=<percent-encoded UTF-8>[&name=Title.md]
+    markview://view?b64=<base64, std or URL-safe>[&name=Title.md]
+    markview://view?file=<absolute path or file:// URL>
+  Parser in Sources/iOS/MarkViewURLParser.swift; opens as a tab (inline
+  payloads reuse a same-named tab so a sender can refresh its content).
+  file= is limited to sandbox-readable locations. Verified end-to-end on the
+  simulator via a DEBUG-only MARKVIEW_TEST_URLS launch-environment hook that
+  feeds the same handleIncoming path as real opens (simctl openurl itself
+  always shows a SpringBoard "Open in MarkView?" confirmation, which cannot
+  be tapped headlessly - scheme registration confirmed by that prompt
+  naming the app; one manual tap would complete that check).
+- [TESTED] P1.9 Tab strip UI (user request): horizontal scrollable chips with
+  close buttons above the document, selection highlight, title follows the
+  selected tab; empty state with an Open button. Two-tab layout, selection,
+  and per-tab content verified via simulator screenshots.
+- [TESTED] P1.10 deleteonclose flag (user request) + developer guide.
+  markview://view?file=...&deleteonclose=1 marks the handoff file as
+  temporary: MarkView deletes it when the user closes the tab (best-effort;
+  not applied if the app terminates first; flag sticks on tab reuse; never
+  applies to inline content or user-opened files). Verified headless via the
+  DEBUG MARKVIEW_TEST_CLOSE_SELECTED_AFTER hook: file present while the tab
+  was open, gone after close, sibling files untouched. DeveloperGuide.md
+  (repo root) documents all integration routes for other apps: macOS open,
+  iPad share sheet / Files / drag-drop, the full markview:// parameter
+  reference, tab-update-by-name behavior, sandbox constraints on file=,
+  and simulator testing recipes.
+
+- [DONE] P.x App group with iPadSSH (2026-07-18): MarkViewPad.entitlements
+  added (group.com.kryslix.markview) + CODE_SIGN_ENTITLEMENTS on the Pad
+  target, so iPadSSH can stage large remote markdown documents in the
+  shared container and open them via markview://view?file=...&
+  deleteonclose=1 (iPadSSH repo: mdview/PROTOCOL.md). Verified in the
+  simulator end-to-end (150 KB document rendered; note: both apps must be
+  built ad-hoc-signed, CODE_SIGN_IDENTITY=-, or the entitlement is
+  stripped and the container resolves nil). User-verified on a real iPad
+  2026-07-18 (large document rendered after rebuilding with the
+  entitlement).
+
+- [TESTED] P.y Default handler for .md in Files (2026-07-18): LSHandlerRank
+  for net.daringfireball.markdown raised Alternate -> Owner in
+  Info-iPad.plist so tapping a .md/.markdown file in the Files app opens
+  MarkView directly instead of the QuickLook preview. public.plain-text
+  stays Alternate on purpose (do not capture .txt). iPadOS has no user
+  setting for this; ranking decides, ties go to whichever claimant iOS
+  prefers. User-verified on device 2026-07-18: tapping .md opens MarkView.
+
+Known iPad limitations (by design / sandbox):
+- Relative-path images and links to sibling files generally cannot be read
+  when a document is opened in place from another app's container (iOS
+  sandbox grants access to the opened file only). Images from http(s) and
+  same-container files still work.
+- No git history/comparison surfaces (git is not available on iPadOS).
+
+---
+
 ## Cross-cutting / Definition of Done
 - [DONE] X.1 All unit test suites green (Renderer, DocumentKey, LinkClassifier,
   HeadingSlugger).

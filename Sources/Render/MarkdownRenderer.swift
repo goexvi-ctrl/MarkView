@@ -1,6 +1,5 @@
 import Foundation
 import CmarkGFM
-import AppKit
 
 // Converts a MarkdownDocument to an HTML body string using cmark-gfm.
 // Plain text files bypass the Markdown pipeline entirely (D-5.7).

@@ -111,3 +111,42 @@ Not sure what syntax MarkView understands? **Help ▸ Markdown Cheat Sheet**
 | Compare with file | `⇧⌘D` |
 | Markdown cheat sheet | `⌘/` |
 | Settings | `⌘,` |
+
+## MarkView on iPad
+
+The same project builds a companion iPad app, **MarkViewPad** (target
+`MarkViewPad` in `MarkView.xcodeproj`). It shares the entire rendering
+pipeline with the Mac app — cmark-gfm, the GitHub-like theme, KaTeX math,
+Mermaid diagrams, syntax highlighting, and the HTML sanitizer — wrapped in a
+single-window tabbed viewer.
+
+- All open documents live in **tabs of a single window**, so it's easy to see
+  what you have open. Open files with the folder button, from the Files app
+  (documents open in place; MarkView also appears in other apps' share sheets
+  and "Open in" menus for Markdown files), or via internal links between
+  documents. Reopening a file you already have open selects its tab.
+- Pinch to zoom, or use the toolbar to change the font size (remembered
+  per document), search the page, and adjust settings. Web links open in
+  Safari. Each tab remembers its scroll position.
+- Other apps can hand content over programmatically with the `markview://`
+  URL scheme (this launches MarkView if needed and shows the content as a
+  tab):
+
+      markview://view?text=<percent-encoded markdown>[&name=Title.md]
+      markview://view?b64=<base64 markdown>[&name=Title.md]
+      markview://view?file=<absolute path or file:// URL>[&deleteonclose=1]
+
+  Sending inline content with the same `name` again updates that tab, so a
+  producing app can refresh what's shown. `file=` works for paths MarkView
+  can read (iOS sandboxing applies); for arbitrary files use the share
+  sheet instead. With `deleteonclose=1` the handoff file is treated as
+  temporary and deleted when the user closes its tab.
+
+  Integrating from your own app? See **DeveloperGuide.md** for the full
+  reference (all routes, parameters, sandbox rules, testing recipes).
+- Viewer only, like the Mac app — and intentionally without the Mac app's
+  git history and comparison features.
+
+Build it with:
+
+    xcodebuild -scheme MarkViewPad -destination 'generic/platform=iOS Simulator' build
