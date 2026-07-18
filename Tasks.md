@@ -361,7 +361,10 @@ support in the iPad target by design.
   (repo root) documents all integration routes for other apps: macOS open,
   iPad share sheet / Files / drag-drop, the full markview:// parameter
   reference, tab-update-by-name behavior, sandbox constraints on file=,
-  and simulator testing recipes.
+  and simulator testing recipes. App-group handoff verified end-to-end on
+  the simulator: MarkViewPad.entitlements (group.com.kryslix.markview) is
+  wired via CODE_SIGN_ENTITLEMENTS; a file written into the shared group
+  container by an external process opened and rendered via file=.
 
 - [DONE] P.x App group with iPadSSH (2026-07-18): MarkViewPad.entitlements
   added (group.com.kryslix.markview) + CODE_SIGN_ENTITLEMENTS on the Pad

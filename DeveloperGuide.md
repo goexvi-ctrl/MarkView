@@ -135,12 +135,36 @@ containers. `file=` only works for locations MarkView itself can read:
 
 - MarkView's own Documents folder (visible in Files as On My iPad >
   MarkView) - anything you can get written there;
-- a shared app-group container, if your app and a MarkView build are
-  configured with a common app group;
+- the shared app-group container `group.com.kryslix.markview`, which
+  MarkView is entitled to (see below);
 - development/testing contexts (see below).
 
 For arbitrary files from your own sandbox, use the share sheet instead - the
 system grants MarkView access as part of the handoff.
+
+**Handoff via the app group**: if your app is signed by the same team and
+declares the `group.com.kryslix.markview` app group in its entitlements, you
+can write the file into the shared container and point MarkView at it:
+
+```swift
+let container = FileManager.default.containerURL(
+    forSecurityApplicationGroupIdentifier: "group.com.kryslix.markview")!
+let fileURL = container.appendingPathComponent("Report.md")
+try markdownText.write(to: fileURL, atomically: true, encoding: .utf8)
+
+var components = URLComponents()
+components.scheme = "markview"
+components.host = "view"
+components.queryItems = [
+    URLQueryItem(name: "file", value: fileURL.path),
+    URLQueryItem(name: "deleteonclose", value: "1"),  // optional cleanup
+]
+UIApplication.shared.open(components.url!)
+```
+
+This is the fully programmatic no-user-interaction-but-one-confirmation-free
+route for same-team apps; combine with `deleteonclose=1` so the container
+does not accumulate handoff files.
 
 ### The delete-on-close flag
 
