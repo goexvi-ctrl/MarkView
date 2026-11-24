@@ -65,7 +65,8 @@ struct PadWebView: UIViewRepresentable {
         let coordinator = context.coordinator
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(AssetSchemeHandler(), forURLScheme: "asset")
-        config.setURLSchemeHandler(LocalImageSchemeHandler(), forURLScheme: "mvimg")
+        // Confined to the document's directory by LocalImagePolicy.
+        config.setURLSchemeHandler(coordinator.imageHandler, forURLScheme: "mvimg")
         config.userContentController.add(coordinator, name: "bridge")
 
         let webView = WKWebView(frame: .zero, configuration: config)
@@ -114,6 +115,8 @@ struct PadWebView: UIViewRepresentable {
 final class PadWebCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
 
     weak var webView: WKWebView?
+    // Serves mvimg:// images; documentDirectory is set on every load.
+    let imageHandler = LocalImageSchemeHandler()
     private let onEvent: (PadWebEvent) -> Void
 
     // Nonce regenerated on each load; incoming bridge messages must echo it.
@@ -152,6 +155,7 @@ final class PadWebCoordinator: NSObject, WKNavigationDelegate, WKScriptMessageHa
         let newNonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
         nonce = newNonce
         let baseDir = fileURL?.deletingLastPathComponent()
+        imageHandler.documentDirectory = baseDir
 
         if text.count > Self.asyncRenderThreshold {
             Task.detached(priority: .userInitiated) {

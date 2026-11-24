@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="{{CSP}}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>{{CSS_VARS}}</style>
 <link rel="stylesheet" href="asset://theme.css">
@@ -9,7 +10,7 @@
 <link rel="stylesheet" href="asset://vendor/highlight-github.min.css">
 </head>
 <body>
-<script>const BRIDGE_NONCE = '{{NONCE}}';</script>
+<script nonce="{{NONCE}}">const BRIDGE_NONCE = '{{NONCE}}';</script>
 <article id="content">
 {{BODY}}
 </article>

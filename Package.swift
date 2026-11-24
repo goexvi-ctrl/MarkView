@@ -19,6 +19,9 @@ let package = Package(
                 "Render/DiffAnnotator.swift",
                 "Render/HeadingSlugger.swift",
                 "Render/LinkClassifier.swift",
+                "Render/HTMLSanitizer.swift",
+                "Render/LocalImagePolicy.swift",
+                "Render/LocalImageRewriter.swift",
             ]
         ),
         .testTarget(

@@ -22,6 +22,8 @@ final class MarkdownWebViewController: NSViewController {
     // Cache for live-reload scroll restore (written by bridge, read by DWC)
     var lastScrollY: Double = 0
     private var appearanceCancellable: AnyCancellable?
+    // Serves mvimg:// images; its documentDirectory is kept in step with document.
+    private let imageHandler = LocalImageSchemeHandler()
 
     // Find-in-page (Cmd-F). The bar is a native AppKit view overlaid on the web
     // view; the actual searching happens in app.js. nil while the bar is hidden.
@@ -109,9 +111,13 @@ final class MarkdownWebViewController: NSViewController {
     private func makeWebViewConfig() -> WKWebViewConfiguration {
         let config = WKWebViewConfiguration()
 
-        // M3: file-access prefs (non-sandboxed build)
-        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
-        config.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
+        // Page scripts get no file:// access and no cross-origin reach.
+        // Documents are untrusted (they may arrive over the network through
+        // ropend); bundled assets come via asset:// and images via mvimg://,
+        // neither of which needs these. Set explicitly so a WebKit default
+        // change cannot quietly re-enable them.
+        config.preferences.setValue(false, forKey: "allowFileAccessFromFileURLs")
+        config.setValue(false, forKey: "allowUniversalAccessFromFileURLs")
 
         // M3: asset:// custom scheme handler for bundled JS/CSS
         config.setURLSchemeHandler(AssetSchemeHandler(), forURLScheme: "asset")
@@ -119,7 +125,9 @@ final class MarkdownWebViewController: NSViewController {
         // mvimg:// custom scheme handler for document-relative local images.
         // (loadHTMLString gives no filesystem read access, so plain file://
         // image paths don't load; rewriteLocalImageSources routes them here.)
-        config.setURLSchemeHandler(LocalImageSchemeHandler(), forURLScheme: "mvimg")
+        // Confined to the document's directory by LocalImagePolicy.
+        imageHandler.documentDirectory = document.fileURL.deletingLastPathComponent()
+        config.setURLSchemeHandler(imageHandler, forURLScheme: "mvimg")
 
         // Bridge
         config.userContentController.add(coordinator, name: "bridge")
@@ -217,6 +225,7 @@ final class MarkdownWebViewController: NSViewController {
     /// pre-rendered bodies) and does not go through the normal single-document template.
     func loadComparisonHTML(_ html: String, baseURL: URL) {
         hasInitialContentLoaded = false
+        imageHandler.documentDirectory = document.fileURL.deletingLastPathComponent()
         webView.loadHTMLString(html, baseURL: baseURL)
     }
 
@@ -235,6 +244,7 @@ final class MarkdownWebViewController: NSViewController {
         nonce = newNonce
 
         let isUpdate = hasInitialContentLoaded
+        imageHandler.documentDirectory = doc.fileURL.deletingLastPathComponent()
 
         // Effective source for this render (may be a git historical snapshot).
         let sourceText = historicalOverride?.text ?? doc.text

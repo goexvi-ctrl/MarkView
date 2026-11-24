@@ -49,6 +49,8 @@ enum HTMLSanitizer {
             text = removeTagWithContent(text, tag: tag)
         }
 
+        text = removeComments(text)
+
         // Process remaining tags
         text = filterTags(text)
 
@@ -91,7 +93,7 @@ enum HTMLSanitizer {
                 let selfRange  = Range(match.range(at: 4), in: html)
             else { continue }
 
-            output += html[lastEnd..<fullRange.lowerBound]
+            output += escapeStrayTagOpeners(html[lastEnd..<fullRange.lowerBound])
             lastEnd = fullRange.upperBound
 
             let isClose = !html[closeRange].isEmpty
@@ -120,8 +122,33 @@ enum HTMLSanitizer {
             }
         }
 
-        output += html[lastEnd...]
+        output += escapeStrayTagOpeners(html[lastEnd...])
         return output
+    }
+
+    /// Text between the tags filterTags recognised. cmark escapes "<" in
+    /// ordinary text as "&lt;", so a literal "<" here is raw HTML the tag
+    /// pattern could not match: most dangerously a tag with no closing ">"
+    /// at the end of the input, e.g.
+    ///     <div>
+    ///     <svg/onload="..."
+    /// which the browser would still parse as a tag, attributes and all.
+    /// Escaping every such "<" turns it into visible text.
+    private static func escapeStrayTagOpeners(_ text: Substring) -> String {
+        guard text.contains("<") else { return String(text) }
+        return text.replacingOccurrences(of: "<", with: "&lt;")
+    }
+
+    /// Removes complete HTML comments before tag filtering; a comment may
+    /// contain tag-like text that would otherwise split it into pieces. An
+    /// unterminated "<!--" is left for escapeStrayTagOpeners to make text.
+    private static func removeComments(_ html: String) -> String {
+        guard let re = try? NSRegularExpression(
+            pattern: "<!--.*?-->", options: [.dotMatchesLineSeparators]
+        ) else { return html }
+        return re.stringByReplacingMatches(
+            in: html, range: NSRange(html.startIndex..., in: html), withTemplate: ""
+        )
     }
 
     private static func sanitizeAttributes(tagName: String, rawAttrs: String) -> String {
@@ -155,24 +182,81 @@ enum HTMLSanitizer {
         return out
     }
 
+    /// Removes on*= attributes from every tag. filterTags already rebuilds
+    /// each tag from allowed attributes, so this is a second line of defence.
+    /// The handler may follow whitespace, "/" or a closing quote
+    /// (<img src="x"/onerror=...>, <img src="x"onerror=...>); browsers accept
+    /// all three as attribute separators. Text outside tags is not touched.
     private static func stripOnEvents(_ html: String) -> String {
-        let pattern = "\\s+on[a-z]+\\s*=\\s*(?:\"[^\"]*\"|'[^']*'|[^\\s>]*)"
-        guard let re = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
-            return html
+        guard let tagRE = try? NSRegularExpression(pattern: "<[a-zA-Z][^>]*>", options: []),
+              let onRE = try? NSRegularExpression(
+                pattern: "(?<=[\\s/\"'])on[a-z]+\\s*=\\s*(?:\"[^\"]*\"|'[^']*'|[^\\s>]*)",
+                options: .caseInsensitive)
+        else { return html }
+        let ns = html as NSString
+        var out = ""
+        var last = 0
+        for m in tagRE.matches(in: html, range: NSRange(location: 0, length: ns.length)) {
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
+            let tag = ns.substring(with: m.range)
+            out += onRE.stringByReplacingMatches(
+                in: tag, range: NSRange(location: 0, length: (tag as NSString).length), withTemplate: "")
+            last = m.range.location + m.range.length
         }
-        return re.stringByReplacingMatches(
-            in: html,
-            range: NSRange(html.startIndex..., in: html),
-            withTemplate: ""
-        )
+        out += ns.substring(from: last)
+        return out
     }
 
-    private static func isAllowedURL(_ url: String) -> Bool {
-        let lower = url.lowercased().trimmingCharacters(in: .whitespaces)
+    /// The value is checked as the browser will see it: the attribute value
+    /// is emitted with its character references intact, and the browser
+    /// decodes them, so "javascript&colon;..." or "java&#115;cript:..." would
+    /// otherwise pass the scheme check. Named references other than the five
+    /// cmark itself emits are refused outright; numeric ones are decoded.
+    /// Tab/CR/LF are dropped and leading control characters and spaces
+    /// trimmed, as the URL parser does.
+    static func isAllowedURL(_ url: String) -> Bool {
+        guard let decoded = decodeForURLCheck(url) else { return false }
+        let lower = decoded.lowercased()
         if lower.hasPrefix("#") || lower.hasPrefix("/") || lower.hasPrefix("./") { return true }
         for scheme in ["http:", "https:", "mailto:", "tel:"] {
             if lower.hasPrefix(scheme) { return true }
         }
         return !lower.contains(":")
+    }
+
+    private static let safeNamedRefs: [String: String] = [
+        "amp": "&", "quot": "\"", "lt": "<", "gt": ">", "apos": "'",
+    ]
+
+    private static func decodeForURLCheck(_ raw: String) -> String? {
+        guard let re = try? NSRegularExpression(
+            pattern: "&(?:#[xX]([0-9a-fA-F]+)|#([0-9]+)|([A-Za-z][A-Za-z0-9]*));?", options: []
+        ) else { return nil }
+        let ns = raw as NSString
+        var out = ""
+        var last = 0
+        for m in re.matches(in: raw, range: NSRange(location: 0, length: ns.length)) {
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
+            last = m.range.location + m.range.length
+            var scalar: UInt32?
+            if m.range(at: 1).location != NSNotFound {
+                scalar = UInt32(ns.substring(with: m.range(at: 1)), radix: 16)
+            } else if m.range(at: 2).location != NSNotFound {
+                scalar = UInt32(ns.substring(with: m.range(at: 2)), radix: 10)
+            } else {
+                let name = ns.substring(with: m.range(at: 3))
+                guard let rep = safeNamedRefs[name] else { return nil }
+                out += rep
+                continue
+            }
+            guard let v = scalar, let u = Unicode.Scalar(v) else { return nil }
+            out.unicodeScalars.append(u)
+        }
+        out += ns.substring(from: last)
+        out.removeAll { $0 == "\t" || $0 == "\n" || $0 == "\r" || $0 == "\r\n" }
+        while let f = out.unicodeScalars.first, f.value <= 0x20 {
+            out.unicodeScalars.removeFirst()
+        }
+        return out
     }
 }

@@ -15,11 +15,36 @@ enum HTMLTemplate {
         // Load template from bundle (M3 wires the real path; stub inline for M1)
         let template = loadTemplate()
         let cssVars = buildCSSVars(settings: settings, zoomFactor: zoomFactor)
+        // {{CSP}} first: it contains {{NONCE}}, filled in below. {{BODY}}
+        // last, so placeholder text inside a document is left alone.
         return template
-            .replacingOccurrences(of: "{{BODY}}", with: body)
+            .replacingOccurrences(of: "{{CSP}}", with: contentSecurityPolicy)
             .replacingOccurrences(of: "{{CSS_VARS}}", with: cssVars)
             .replacingOccurrences(of: "{{NONCE}}", with: nonce)
+            .replacingOccurrences(of: "{{BODY}}", with: body)
     }
+
+    /// Content-Security-Policy for every page MarkView renders. The document
+    /// is untrusted, so: scripts only from the bundle (asset:) or the one
+    /// inline bridge script carrying the per-load nonce; no network
+    /// connections of any kind (connect-src), which is what keeps a script
+    /// that slips past the sanitizer from sending anything off the machine;
+    /// images from the bundle, mvimg: (local, see LocalImagePolicy), data:
+    /// and the web. Contains {{NONCE}}, replaced by the caller.
+    static let contentSecurityPolicy = [
+        "default-src 'none'",
+        "script-src asset: 'nonce-{{NONCE}}'",
+        "style-src asset: 'unsafe-inline'",
+        "img-src asset: mvimg: data: https: http:",
+        "font-src asset: data:",
+        "connect-src 'none'",
+        "media-src 'none'",
+        "object-src 'none'",
+        "frame-src 'none'",
+        "worker-src 'none'",
+        "base-uri 'none'",
+        "form-action 'none'",
+    ].joined(separator: "; ")
 
     private static func loadTemplate() -> String {
         if let url = Bundle.main.url(forResource: "template", withExtension: "html", subdirectory: "WebAssets"),
@@ -53,6 +78,7 @@ enum HTMLTemplate {
     <html>
     <head>
     <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="{{CSP}}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>{{CSS_VARS}}</style>
     <style>
@@ -62,7 +88,7 @@ enum HTMLTemplate {
     </style>
     </head>
     <body>
-    <script>const BRIDGE_NONCE = '{{NONCE}}';</script>
+    <script nonce="{{NONCE}}">const BRIDGE_NONCE = '{{NONCE}}';</script>
     {{BODY}}
     <script src="asset://app.js"></script>
     </body>
@@ -88,12 +114,16 @@ enum HTMLTemplate {
         let leftEsc = MarkdownRenderer.htmlEscape(leftLabel)
         let rightEsc = MarkdownRenderer.htmlEscape(rightLabel)
         let statsEsc = MarkdownRenderer.htmlEscape(stats)
+        // Only the page's own inline script carries this nonce.
+        let scriptNonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        let csp = contentSecurityPolicy.replacingOccurrences(of: "{{NONCE}}", with: scriptNonce)
 
         return """
         <!DOCTYPE html>
         <html lang="en">
         <head>
         <meta charset="utf-8">
+        <meta http-equiv="Content-Security-Policy" content="\(csp)">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>\(cssVars)</style>
         <link rel="stylesheet" href="asset://theme.css">
@@ -280,7 +310,7 @@ enum HTMLTemplate {
         <!-- Cmd-F find. find.js defines window.markviewFind/Step/ClearFind and, with
              no #content in this page, searches document.body (both diff panes). -->
         <script src="asset://find.js"></script>
-        <script>
+        <script nonce="\(scriptNonce)">
         const BRIDGE_NONCE = 'compare-only';
 
         (function() {

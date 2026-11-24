@@ -38,6 +38,7 @@
 		5F00PKG2000000000000BBBB /* CmarkGFM in Frameworks */ = {isa = PBXBuildFile; productRef = 5F00PKG1000000000000BBBB /* CmarkGFM */; };
 		5F00PKG5000000000000BBBB /* BeautifulMermaid in Frameworks */ = {isa = PBXBuildFile; productRef = 5F00PKG4000000000000BBBB /* BeautifulMermaid */; };
 		5FPADB00000000000000CCCC /* LocalImageRewriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FPADF08000000000000CCCC /* LocalImageRewriter.swift */; };
+		5FSECB01000000000000DDDD /* LocalImagePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FSECF01000000000000DDDD /* LocalImagePolicy.swift */; };
 		5FPADB01000000000000CCCC /* MarkViewPadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FPADF01000000000000CCCC /* MarkViewPadApp.swift */; };
 		5FPADB03000000000000CCCC /* DocumentViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FPADF03000000000000CCCC /* DocumentViewerView.swift */; };
 		5FPADB04000000000000CCCC /* PadWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FPADF04000000000000CCCC /* PadWebView.swift */; };
@@ -51,6 +52,7 @@
 		5FPADB12000000000000CCCC /* LinkClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001034000000000000BBBB /* LinkClassifier.swift */; };
 		5FPADB13000000000000CCCC /* HTMLSanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001035000000000000BBBB /* HTMLSanitizer.swift */; };
 		5FPADB14000000000000CCCC /* LocalImageRewriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FPADF08000000000000CCCC /* LocalImageRewriter.swift */; };
+		5FSECB02000000000000DDDD /* LocalImagePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FSECF01000000000000DDDD /* LocalImagePolicy.swift */; };
 		5FPADB15000000000000CCCC /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001040000000000000BBBB /* SettingsStore.swift */; };
 		5FPADB16000000000000CCCC /* WebAssets in Resources */ = {isa = PBXBuildFile; fileRef = 5F001053000000000000BBBB /* WebAssets */; };
 		5FPADB17000000000000CCCC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5FPADF07000000000000CCCC /* Assets.xcassets */; };
@@ -116,6 +118,7 @@
 		5FPADF11000000000000CCCC /* DocumentTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTabs.swift; sourceTree = "<group>"; };
 		5FPADF07000000000000CCCC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5FPADF08000000000000CCCC /* LocalImageRewriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalImageRewriter.swift; sourceTree = "<group>"; };
+		5FSECF01000000000000DDDD /* LocalImagePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalImagePolicy.swift; sourceTree = "<group>"; };
 		5FPADF09000000000000CCCC /* MarkViewPad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MarkViewPad.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -230,6 +233,7 @@
 				5F001035000000000000BBBB /* HTMLSanitizer.swift */,
 				5F001036000000000000BBBB /* DiffAnnotator.swift */,
 				5FPADF08000000000000CCCC /* LocalImageRewriter.swift */,
+				5FSECF01000000000000DDDD /* LocalImagePolicy.swift */,
 			);
 			path = Render;
 			sourceTree = "<group>";
@@ -462,6 +466,7 @@
 				5F002041000000000000BBBB /* SettingsView.swift in Sources */,
 				5F002042000000000000BBBB /* FontPicker.swift in Sources */,
 				5FPADB00000000000000CCCC /* LocalImageRewriter.swift in Sources */,
+				5FSECB01000000000000DDDD /* LocalImagePolicy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -493,6 +498,7 @@
 				5FPADB12000000000000CCCC /* LinkClassifier.swift in Sources */,
 				5FPADB13000000000000CCCC /* HTMLSanitizer.swift in Sources */,
 				5FPADB14000000000000CCCC /* LocalImageRewriter.swift in Sources */,
+				5FSECB02000000000000DDDD /* LocalImagePolicy.swift in Sources */,
 				5FPADB15000000000000CCCC /* SettingsStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

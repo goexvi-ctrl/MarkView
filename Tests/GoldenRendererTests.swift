@@ -103,6 +103,22 @@ struct GoldenRendererTests {
         #expect(!out.contains("alert(1)"))
     }
 
+    // The four payloads from the 2026-11-09 ropend security review, through
+    // the real cmark path. Each ends in a tag with no closing ">".
+    @Test("Unterminated-tag XSS payloads render inert",
+          arguments: [
+            "# T\n\n<div>\n<img src=\"x\"/onerror=\"document.title='EXEC'\"",
+            "# T\n\n<div>\n<img src=\"x\"onerror=\"document.title='EXEC'\"",
+            "# T\n\n<div>\n<svg/onload=\"document.title='EXEC'\"",
+            "# T\n\n<div>\n<details open/ontoggle=\"document.title='EXEC'\"",
+          ])
+    func unterminatedTagPayloads(md: String) {
+        let out = html(md)
+        #expect(out.range(of: "<[a-zA-Z][^>]*\\son[a-z]+\\s*=", options: .regularExpression) == nil)
+        #expect(out.range(of: "<(img|svg|details)\\b", options: .regularExpression) == nil)
+        #expect(out.contains("&lt;"))
+    }
+
     @Test("ins tag passes sanitizer")
     func insAllowed() {
         let out = html("<ins>underline</ins>")

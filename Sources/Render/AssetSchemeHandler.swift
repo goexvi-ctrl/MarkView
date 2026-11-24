@@ -77,12 +77,20 @@ final class AssetSchemeHandler: NSObject, WKURLSchemeHandler {
 }
 
 // Custom URL scheme handler for mvimg:// URLs.
-// Serves a local file from disk by the absolute path carried in the URL.
+// Serves a local image file by the absolute path carried in the URL.
 // Document-relative <img src="..."> paths are rewritten to mvimg:// at load
-// time (see MarkdownWebView) because loadHTMLString(_:baseURL:) does not grant
-// the WebContent process read access to the document's directory, so plain
-// file:// images never load.
+// time (see LocalImageRewriter) because loadHTMLString(_:baseURL:) does not
+// grant the WebContent process read access to the document's directory, so
+// plain file:// images never load.
+//
+// What may be served is decided by LocalImagePolicy: by default only regular
+// image files inside the current document's directory subtree. The owner sets
+// documentDirectory before each load.
+@MainActor
 final class LocalImageSchemeHandler: NSObject, WKURLSchemeHandler {
+
+    /// Directory of the document being shown; nil refuses everything.
+    var documentDirectory: URL?
 
     func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
         guard let url = urlSchemeTask.request.url, !url.path.isEmpty else {
@@ -90,8 +98,18 @@ final class LocalImageSchemeHandler: NSObject, WKURLSchemeHandler {
             return
         }
 
+        let allowOutside = UserDefaults.standard.bool(forKey: LocalImagePolicy.allowOutsideDefaultsKey)
+        let confine = documentDirectory.map {
+            LocalImagePolicy.mustConfine(documentDirectory: $0, allowOutside: allowOutside)
+        } ?? true
+
         // url.path is the percent-decoded absolute filesystem path.
-        let fileURL = URL(fileURLWithPath: url.path)
+        guard let fileURL = LocalImagePolicy.resolve(
+            path: url.path, documentDirectory: documentDirectory, confine: confine
+        ) else {
+            fail(urlSchemeTask, status: 403)
+            return
+        }
 
         guard let data = try? Data(contentsOf: fileURL) else {
             fail(urlSchemeTask, status: 404)
@@ -100,7 +118,7 @@ final class LocalImageSchemeHandler: NSObject, WKURLSchemeHandler {
 
         let response = URLResponse(
             url: url,
-            mimeType: mimeType(for: fileURL.pathExtension),
+            mimeType: LocalImagePolicy.mimeType(forPath: fileURL.path),
             expectedContentLength: data.count,
             textEncodingName: nil
         )
@@ -116,21 +134,5 @@ final class LocalImageSchemeHandler: NSObject, WKURLSchemeHandler {
         let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)!
         task.didReceive(response)
         task.didFinish()
-    }
-
-    private func mimeType(for ext: String) -> String {
-        switch ext.lowercased() {
-        case "png":          return "image/png"
-        case "jpg", "jpeg":  return "image/jpeg"
-        case "gif":          return "image/gif"
-        case "svg":          return "image/svg+xml"
-        case "webp":         return "image/webp"
-        case "bmp":          return "image/bmp"
-        case "ico":          return "image/x-icon"
-        case "tif", "tiff":  return "image/tiff"
-        case "avif":         return "image/avif"
-        case "heic":         return "image/heic"
-        default:             return "application/octet-stream"
-        }
     }
 }
