@@ -25,3 +25,6 @@ Thumbs.db
 
 # Xcode user state anywhere (incl. workspaces inside vendored packages)
 xcuserdata/
+
+# Private task list: kept locally, never tracked
+Tasks.md

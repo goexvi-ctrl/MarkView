@@ -484,9 +484,6 @@ network fetch), pinned to specific versions recorded in a `VENDOR.md`.
 - **Manual / UI smoke**: live-reload on save, window dedup, zoom, per-block
   toggle, copy, settings live-update, external link to browser.
 
-A `Tasks.md` will track milestones (Section 18) with the
-NEW/STARTED/CODED/TESTED/DONE lifecycle.
-
 ---
 
 ## 18. Implementation Milestones

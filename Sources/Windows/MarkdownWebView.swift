@@ -74,7 +74,6 @@ final class MarkdownWebViewController: NSViewController {
         //
         // This is deliberately separate from the menu-driven Cmd+/- zoom (which uses
         // the CSS --zoom variable to change effective font sizes and cause reflow).
-        // See user clarification and BUG-2 in Tasks.md.
         webView.allowsMagnification = true
 
         // We do NOT add a custom NSMagnificationGestureRecognizer that drives
