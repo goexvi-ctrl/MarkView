@@ -57,6 +57,7 @@
 		5FPADB18000000000000CCCC /* CmarkGFM in Frameworks */ = {isa = PBXBuildFile; productRef = 5FPADP01000000000000CCCC /* CmarkGFM */; };
 		5FPADB19000000000000CCCC /* MarkViewURLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FPADF10000000000000CCCC /* MarkViewURLParser.swift */; };
 		5FPADB20000000000000CCCC /* DocumentTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FPADF11000000000000CCCC /* DocumentTabs.swift */; };
+		5FPADB21000000000000CCCC /* FileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F001022000000000000BBBB /* FileWatcher.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -484,6 +485,7 @@
 				5FPADB19000000000000CCCC /* MarkViewURLParser.swift in Sources */,
 				5FPADB06000000000000CCCC /* MarkdownDocument.swift in Sources */,
 				5FPADB07000000000000CCCC /* DocumentKey.swift in Sources */,
+				5FPADB21000000000000CCCC /* FileWatcher.swift in Sources */,
 				5FPADB08000000000000CCCC /* MarkdownRenderer.swift in Sources */,
 				5FPADB09000000000000CCCC /* HeadingSlugger.swift in Sources */,
 				5FPADB10000000000000CCCC /* HTMLTemplate.swift in Sources */,

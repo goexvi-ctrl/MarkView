@@ -13,7 +13,7 @@ struct OpenDocument: Identifiable {
     let displayName: String
     var text: String
     let fileType: MarkdownDocument.FileType
-    let usedLossyEncoding: Bool
+    var usedLossyEncoding: Bool
     let holdsSecurityScope: Bool
     let canonicalPath: String?   // dedupe key for file-backed tabs
     // Sender-requested cleanup (markview://...&deleteonclose=1): the file is
@@ -35,6 +35,11 @@ final class DocumentTabsModel: ObservableObject {
     // arrive continuously and must not invalidate the whole view tree.
     private var scrollPositions: [OpenDocument.ID: Double] = [:]
 
+    // One watcher per file-backed tab: the tab re-reads its file when the
+    // file changes, so a producer that rewrites it (iPadSSH's ropen -f, an
+    // editor saving through Files) keeps the tab current.
+    private var watchers: [OpenDocument.ID: FileWatcher] = [:]
+
     var selectedDocument: OpenDocument? {
         documents.first { $0.id == selectedID }
     }
@@ -47,7 +52,8 @@ final class DocumentTabsModel: ObservableObject {
     }
 
     /// Opens a file-backed tab (Files app, file picker, internal links,
-    /// markview://...?file=). Re-selects an existing tab for the same file.
+    /// markview://...?file=). Re-selects an existing tab for the same file,
+    /// re-reading the file in case it changed unseen.
     /// Returns an error message on failure.
     @discardableResult
     func openFile(_ url: URL, deleteOnClose: Bool = false) -> String? {
@@ -55,6 +61,7 @@ final class DocumentTabsModel: ObservableObject {
         if let index = documents.firstIndex(where: { $0.canonicalPath == canonical }) {
             if deleteOnClose { documents[index].deleteOnClose = true }
             selectedID = documents[index].id
+            reload(documents[index].id)
             return nil
         }
 
@@ -71,16 +78,7 @@ final class DocumentTabsModel: ObservableObject {
             return "Cannot open \(url.lastPathComponent): no access to that file from here."
         }
 
-        let text: String
-        let lossy: Bool
-        if let clean = String(data: data, encoding: .utf8) {
-            text = clean
-            lossy = false
-        } else {
-            text = String(data: data, encoding: .isoLatin1)
-                ?? String(decoding: data, as: UTF8.self)
-            lossy = true
-        }
+        let (text, lossy) = Self.decode(data)
 
         let doc = OpenDocument(
             fileURL: url,
@@ -94,7 +92,33 @@ final class DocumentTabsModel: ObservableObject {
         )
         documents.append(doc)
         selectedID = doc.id
+        let id = doc.id
+        watchers[id] = FileWatcher(url: url) { [weak self] in
+            self?.reload(id)
+        }
         return nil
+    }
+
+    /// Re-reads a file-backed tab's file. A file that has gone (deleted,
+    /// or mid-way through an atomic save) leaves the tab as it was.
+    private func reload(_ id: OpenDocument.ID) {
+        guard let index = documents.firstIndex(where: { $0.id == id }),
+              let url = documents[index].fileURL,
+              let data = try? Data(contentsOf: url) else { return }
+        let (text, lossy) = Self.decode(data)
+        if documents[index].text != text {
+            documents[index].text = text
+            documents[index].usedLossyEncoding = lossy
+        }
+    }
+
+    /// UTF-8 if the bytes are, else Latin-1 (flagged as lossy).
+    private static func decode(_ data: Data) -> (String, Bool) {
+        if let clean = String(data: data, encoding: .utf8) {
+            return (clean, false)
+        }
+        return (String(data: data, encoding: .isoLatin1)
+                    ?? String(decoding: data, as: UTF8.self), true)
     }
 
     /// Opens (or updates) a tab for a markview:// payload. Inline content
@@ -139,6 +163,7 @@ final class DocumentTabsModel: ObservableObject {
             }
         }
         documents.remove(at: index)
+        watchers[id] = nil
         scrollPositions[id] = nil
         if selectedID == id {
             let neighbor = min(index, documents.count - 1)

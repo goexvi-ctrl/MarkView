@@ -125,7 +125,10 @@ are shown to the user as a transient banner in the MarkView window.
 **Updating content in place**: sending inline content (`text`/`b64`) with
 the same `name` again replaces that tab's content rather than opening a new
 tab. A producing app can therefore keep one "live" tab up to date by
-re-sending the URL. File-backed tabs are deduplicated by path the same way.
+re-sending the URL. File-backed tabs are deduplicated by path the same way,
+and (iPad) a file-backed tab watches its file: rewrite the file and the tab
+shows the new contents, with no URL needed (opening the same `file=` again
+also re-reads it).
 
 **Size limits**: inline content travels in the URL, which is practically
 limited to a few tens of kilobytes. Beyond that, hand over a file.
